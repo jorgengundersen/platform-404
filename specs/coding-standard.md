@@ -310,6 +310,39 @@ platform-404/
 
 ## Git Conventions
 
-- Conventional commits: `feat:`, `fix:`, `refactor:`, `test:`, `docs:`, `chore:`
-- Keep commits small and focused
+### Commit Messages
+
+Follow [Conventional Commits](https://www.conventionalcommits.org/): `type(scope): description`
+
+**Types:**
+
+| Type | Usage |
+|------|-------|
+| `feat` | New feature |
+| `fix` | Bug fix |
+| `refactor` | Code change that neither fixes a bug nor adds a feature |
+| `test` | Adding or updating tests |
+| `docs` | Documentation only |
+| `chore` | Build, CI, tooling, deps |
+
+**Scope** is the area of the codebase affected — typically a layer or module:
+
+`primitives`, `services`, `api`, `ui`, `db`, `ci`, `deps`
+
+**Examples:**
+
+```
+feat(api): add session detail endpoint
+fix(services): handle empty token array in stats query
+refactor(primitives): extract date bucketing into own module
+test(services): add ingestion service integration tests
+chore(deps): bump effect to 3.x
+docs(specs): update testing standard
+```
+
+### General Rules
+
+- Keep commits small and focused — one logical change per commit
+- Write description in imperative mood: "add" not "added"
+- No period at the end of the description
 - Branch naming: `feat/thing`, `fix/thing`
