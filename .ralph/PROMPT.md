@@ -1,14 +1,15 @@
 # Ralph Loop Prompt
 
-Review @specs/* to understand the project specifications.
+Review @specs/README.md to get an Spec overview
 Review @AGENTS.md for coding standards.
 
-Plan: @plans/current/initial-setup/test-infra-setup-plan.md
+Plan: @plans/current/initial-setup/implementation_plan.md
 Study it.
 
 Choose the most important ONE item from the plan and implement it.
 
 Rules:
+- run tests to make sure they are green before starting. fix any issues (no quick fix, only proper fix)
 - ONE task per session. Do not do more than one.
 - Interpretation: ONE task = ONE deliverable checkbox from the plan.
 - TDD deliverable includes BOTH red + green in the same session (write failing test, then minimal implementation to pass).

@@ -13,6 +13,7 @@ set -euo pipefail
 # Defaults (adjust these)
 # ---------------------------------------------------------------------------
 DEFAULT_MODEL="github-copilot/gpt-5.2-codex"
+DEFAULT_AGENT="ralph-main"
 DEFAULT_PROMPT=".ralph/PROMPT.md"
 DEFAULT_PLAN="FIX_PLAN.md"
 DEFAULT_MAX_ITERATIONS=10
@@ -34,6 +35,7 @@ usage: ralph-loop [options]
 
 options:
   -m, --model <model>       model to use (default: $DEFAULT_MODEL)
+  -a, --agent <agent>       agent to use (default: $DEFAULT_AGENT)
   -p, --prompt <file>       prompt file, relative to project root (default: $DEFAULT_PROMPT)
   -P, --plan <file>         plan file, relative to project root (default: $DEFAULT_PLAN)
   -n, --max-iterations <n>  max loop iterations (default: $DEFAULT_MAX_ITERATIONS)
@@ -46,6 +48,7 @@ EOF
 # Parse args
 # ---------------------------------------------------------------------------
 MODEL="$DEFAULT_MODEL"
+AGENT="$DEFAULT_AGENT"
 PROMPT_REL="$DEFAULT_PROMPT"
 PLAN_REL="$DEFAULT_PLAN"
 MAX_ITERATIONS="$DEFAULT_MAX_ITERATIONS"
@@ -55,6 +58,7 @@ LOG_FILE="$PROJECT_DIR/$DEFAULT_LOG_FILE"
 while [[ $# -gt 0 ]]; do
   case "$1" in
     -m|--model)         MODEL="$2"; shift 2 ;;
+    -a|--agent)         AGENT="$2"; shift 2 ;;
     -p|--prompt)        PROMPT_REL="$2"; shift 2 ;;
     -P|--plan)          PLAN_REL="$2"; shift 2 ;;
     -n|--max-iterations) MAX_ITERATIONS="$2"; shift 2 ;;
@@ -118,6 +122,7 @@ check_plan_complete() {
 log INFO "ralph loop starting"
 log INFO "project:    $PROJECT_DIR"
 log INFO "model:      $MODEL"
+log INFO "agent:      $AGENT"
 log INFO "prompt:     $PROMPT_REL"
 log INFO "plan:       $PLAN_REL"
 log INFO "max:        $MAX_ITERATIONS"
@@ -150,7 +155,7 @@ for ((LOOP_COUNT=1; LOOP_COUNT<=MAX_ITERATIONS; LOOP_COUNT++)); do
   log INFO "[loop $LOOP_COUNT/$MAX_ITERATIONS] starting fresh context"
 
   PROMPT=$(cat "$PROMPT_FILE")
-  opencode run "$PROMPT" --model "$MODEL" --dir "$PROJECT_DIR" --thinking "true" || true
+  opencode run "$PROMPT" --model "$MODEL" --agent "$AGENT" --dir "$PROJECT_DIR" --thinking "true" || true
 
   log INFO "[loop $LOOP_COUNT/$MAX_ITERATIONS] session ended"
 

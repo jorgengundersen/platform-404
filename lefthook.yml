@@ -1,6 +1,11 @@
 pre-commit:
   parallel: false
   jobs:
+    - name: mdformat
+      run: |
+        command -v mdformat >/dev/null 2>&1 || exit 0
+        git diff --cached --name-only --diff-filter=ACM -z -- '*.md' | xargs -0 -r mdformat --wrap 80
+        git diff --cached --name-only --diff-filter=ACM -z -- '*.md' | xargs -0 -r git add
     - name: format-check
       run: bun run format:check
     - name: lint
