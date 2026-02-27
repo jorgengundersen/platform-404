@@ -14,8 +14,10 @@ export async function statsOverviewHandler(
   const db = openDashboardDb(dbPath);
 
   try {
-    // Query total session count
-    const result = db.query("SELECT COUNT(*) as total FROM sessions").get() as {
+    // Query total session count (using DISTINCT to handle malformed schemas with duplicate ids)
+    const result = db
+      .query("SELECT COUNT(DISTINCT id) as total FROM sessions")
+      .get() as {
       total: number;
     } | null;
 

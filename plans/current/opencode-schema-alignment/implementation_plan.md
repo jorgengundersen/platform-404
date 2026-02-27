@@ -16,7 +16,7 @@ Goal: align to real OpenCode SQLite schema (`project`/`session`) and ingest sess
 - [x] TDD: `DashboardDb` schema v2: sessions uses TEXT ids; add/ensure `project_name` column (migration safe for existing db)
 - [x] TDD: `IngestionService.ingestOnce` upserts sessions with `project_name` populated via project lookup
 - [x] TDD: `IngestionService.ingestOnce` cursor watermark advances correctly when multiple sessions share same `time_updated`
-- [ ] TDD: `/api/stats/overview` still returns correct `totalSessions` after schema alignment + ingestion
+- [x] TDD: `/api/stats/overview` still returns correct `totalSessions` after schema alignment + ingestion
 
 ## Target Structure (only as needed by tasks)
 - `src/services/source-db.ts`
