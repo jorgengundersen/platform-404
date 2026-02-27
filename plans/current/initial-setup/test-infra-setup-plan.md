@@ -22,7 +22,7 @@ Establish the testing facility so red/green TDD can begin. Pre-commit hook enfor
 - [x] Create `tsconfig.json` -- strict, path aliases `@/*`, Bun-compatible (`tsconfig.json`)
 - [x] Create `biome.json` -- formatting + lint rules (no `any`, etc.) (`biome.json`)
 - [x] Scaffold dirs: `src/{primitives,services,api,ui}`, `test/{primitives,services,api}` (dirs)
-- [ ] Add npm scripts: `typecheck`, `lint`, `format`, `format:check`, `check`, `test`, `validate` (`package.json`)
+- [x] Add npm scripts: `typecheck`, `lint`, `format`, `format:check`, `check`, `test`, `validate` (`package.json`)
 - [x] Seed TDD cycle: `math.add` (prove red/green works end-to-end)
   - [x] Red: `test/primitives/math.test.ts` fails for the right reason; run `bun test`
   - [x] Green: `src/primitives/math.ts` minimal `add` implementation; run `bun test`
