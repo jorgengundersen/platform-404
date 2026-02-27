@@ -86,32 +86,57 @@ import type { SessionSummary } from "@/primitives/types"
 
 ## Primitives (Layer 0)
 
-The foundation. Every primitive must be:
+The foundation. Primitives come in two forms:
 
-1. **Pure** - same input, same output, no side effects
-2. **Total** - handles all inputs, never throws (return discriminated results for partial functions)
+- **Functions** — small, referentially transparent, typed
+- **Definitions** — schemas, branded types, tagged unions wrapping `@effect/schema`, `Data`, etc. into a stable internal vocabulary
+
+Every primitive must be:
+
+1. **Referentially transparent** - same input, same output, no side effects. May use Effect data types (`Option`, `Either`, `Data`, `Brand`, `Schema`)
+2. **Total** - handles all inputs, never throws. Express failure via `Option`, `Either`, or `@effect/schema` decode results
 3. **Small** - does one thing
 4. **Typed** - input and output types are explicit, no implicit `any`
+5. **Testable without `Layer`** - no Effect service machinery (`Context.Tag`, `Layer`, `yield* SomeService`)
 
 ```typescript
-// GOOD - pure, total, typed
-export function safeParseJson(raw: string): { ok: true; value: unknown } | { ok: false; error: string } {
+// GOOD - pure, total, typed, uses Effect data types
+import { Option } from "effect"
+
+export function safeParseJson(raw: string): Option.Option<unknown> {
   try {
-    return { ok: true, value: JSON.parse(raw) }
-  } catch (e) {
-    return { ok: false, error: e instanceof Error ? e.message : "parse failed" }
+    return Option.some(JSON.parse(raw))
+  } catch {
+    return Option.none()
   }
 }
 
-// BAD - throws, impure
-export function parseJson(raw: string): unknown {
-  return JSON.parse(raw) // throws on invalid input
-}
+// GOOD - schema definition as a primitive
+import { Schema } from "@effect/schema"
+
+export const TokenRecord = Schema.Struct({
+  input: Schema.Number,
+  output: Schema.Number,
+  reasoning: Schema.Number,
+  cache: Schema.Struct({
+    read: Schema.Number,
+    write: Schema.Number,
+  }),
+})
+
+// BAD - uses Effect service machinery (this belongs in Layer 1)
+import { Effect } from "effect"
+import { DashboardDb } from "@/services/dashboard-db"
+
+export const getTotals = Effect.gen(function* () {
+  const db = yield* DashboardDb // service dependency = not a primitive
+  // ...
+})
 ```
 
 ### Schema Definitions
 
-Use `@effect/schema` for data validation at boundaries (API params, JSON columns from DB).
+Schemas are primitives — they're the shared vocabulary between layers. They live in `primitives/schemas/` and use `@effect/schema` for data validation at boundaries (API params, JSON columns from DB).
 
 ```typescript
 import { Schema } from "@effect/schema"
@@ -128,8 +153,6 @@ export const TokenRecord = Schema.Struct({
 
 export type TokenRecord = typeof TokenRecord.Type
 ```
-
-Schema definitions live in `primitives/schemas/`. They are the shared vocabulary between layers.
 
 ## Services (Layer 1)
 

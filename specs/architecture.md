@@ -192,7 +192,7 @@ This database stores:
 
 ```
 src/
-  primitives/       # Layer 0 - Pure, composable building blocks
+  primitives/       # Layer 0 - Composable building blocks, dependency wrappers
   services/         # Layer 1 - Business logic (Effect services + layers)
   api/              # Layer 2 - HTTP routes
   ui/               # Layer 3 - HTML templates + CSS
@@ -201,20 +201,21 @@ src/
 
 ### Layer 0: Primitives
 
-Pure functions and simple data transformers. No Effect, no dependencies, no side effects.
+Composable building blocks. Pure when possible. Wraps external libs into clean internal APIs when needed. No Effect service machinery.
 
 Examples:
 - `primitives/time.ts` - timestamp formatting, date ranges, bucketing
 - `primitives/tokens.ts` - token math (totals, averages, cost calculations)
-- `primitives/json.ts` - safe JSON parsing for opencode data columns
+- `primitives/json.ts` - safe JSON parsing for opencode data columns (returns `Option`)
 - `primitives/stats.ts` - statistical functions (sum, avg, percentiles)
 - `primitives/sql.ts` - query builder helpers, parameter sanitization
+- `primitives/schemas/` - `@effect/schema` definitions for domain types
 
 Rules:
-- Pure functions only (input -> output)
-- No imports from `effect` (exception: `@effect/schema` for data validation)
-- No I/O, no state, no services
-- Fully unit testable with simple assertions
+- Prefer pure functions (input -> output)
+- May use Effect data types (`Option`, `Either`, `Data`, `Brand`, `Schema`, `Match`)
+- No Effect service machinery (`Context.Tag`, `Layer`, `yield* SomeService`)
+- Testable without providing any `Layer`
 
 ### Layer 1: Services
 

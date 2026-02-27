@@ -1,3 +1,6 @@
+.ralph/LOG
+.ralph/DONE
+
 # Logs
 logs
 *.log

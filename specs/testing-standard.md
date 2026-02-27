@@ -82,10 +82,13 @@ describe("sumTokens", () => {
 
 - **One `describe` per function** being tested
 - **Descriptive test names** that read as sentences: `"returns zeros for empty array"`
-- **No mocks** - primitives are pure, they don't need mocks
+- **Prefer no mocks** - most primitives are referentially transparent and need no mocks. When a primitive wraps an external dependency, test doubles are acceptable but prefer the real dependency when it's fast and deterministic
 - **Test edge cases**: empty inputs, zero values, large numbers, malformed data
 - **Test the contract, not the code**: if the implementation changes but behavior stays the same, tests should still pass
 - **No test helpers that hide assertions** - keep assertions visible in each test
+
+> **Note:** Some primitives wrap external dependencies (e.g. `@effect/schema`, codecs).
+> These are still tested at the unit level but may need the external dependency present rather than mocked.
 
 ### What to Test
 
@@ -205,7 +208,7 @@ Use sparingly. Most logic is tested at the service and primitive layers.
 - **UI HTML output** - visual verification is more effective than string matching
 - **CSS** - not testable in meaningful ways without a browser
 - **Effect Layer wiring** - the type system catches composition errors
-- **Third-party libraries** - trust `@effect/sql`, `bun:sqlite`, etc.
+- **Third-party libraries directly** - trust `@effect/sql`, `bun:sqlite`, etc. to work correctly. DO test your primitives that wrap or configure these libraries (e.g. schema definitions, codec wrappers) — you're testing your code's contract with the library, not the library itself
 - **Private functions** - if they matter, they should be primitives; if not, they're implementation details
 
 ## Test Quality Checklist

@@ -1,0 +1,158 @@
+#!/usr/bin/env bash
+set -euo pipefail
+
+# Ralph Wiggum Loop (minimal)
+# Coined by Geoffrey Huntley - https://ghuntley.com/ralph
+#
+# Core idea: fresh context each iteration. One task per loop.
+# The agent reads specs + plan, picks the most important task,
+# implements it with backpressure (tests/build), updates the plan,
+# and commits. Then the session ends and a fresh one starts.
+
+# ---------------------------------------------------------------------------
+# Defaults (adjust these)
+# ---------------------------------------------------------------------------
+DEFAULT_MODEL="github-copilot/gpt-5.2-codex"
+DEFAULT_PROMPT=".ralph/PROMPT.md"
+DEFAULT_PLAN="FIX_PLAN.md"
+DEFAULT_MAX_ITERATIONS=10
+DEFAULT_DONE_FILE=".ralph/DONE"
+DEFAULT_LOG_FILE=".ralph/LOG"
+
+# ---------------------------------------------------------------------------
+# Resolve paths
+# ---------------------------------------------------------------------------
+SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+PROJECT_DIR="$(cd "$SCRIPT_DIR/.." && pwd)"
+
+# ---------------------------------------------------------------------------
+# Usage
+# ---------------------------------------------------------------------------
+usage() {
+  cat <<EOF
+usage: ralph-loop [options]
+
+options:
+  -m, --model <model>       model to use (default: $DEFAULT_MODEL)
+  -p, --prompt <file>       prompt file, relative to project root (default: $DEFAULT_PROMPT)
+  -P, --plan <file>         plan file, relative to project root (default: $DEFAULT_PLAN)
+  -n, --max-iterations <n>  max loop iterations (default: $DEFAULT_MAX_ITERATIONS)
+  -h, --help                show this help
+EOF
+  exit 0
+}
+
+# ---------------------------------------------------------------------------
+# Parse args
+# ---------------------------------------------------------------------------
+MODEL="$DEFAULT_MODEL"
+PROMPT_REL="$DEFAULT_PROMPT"
+PLAN_REL="$DEFAULT_PLAN"
+MAX_ITERATIONS="$DEFAULT_MAX_ITERATIONS"
+DONE_FILE="$PROJECT_DIR/$DEFAULT_DONE_FILE"
+LOG_FILE="$PROJECT_DIR/$DEFAULT_LOG_FILE"
+
+while [[ $# -gt 0 ]]; do
+  case "$1" in
+    -m|--model)         MODEL="$2"; shift 2 ;;
+    -p|--prompt)        PROMPT_REL="$2"; shift 2 ;;
+    -P|--plan)          PLAN_REL="$2"; shift 2 ;;
+    -n|--max-iterations) MAX_ITERATIONS="$2"; shift 2 ;;
+    -h|--help)          usage ;;
+    *) echo "error: unknown option: $1" >&2; usage ;;
+  esac
+done
+
+PROMPT_FILE="$PROJECT_DIR/$PROMPT_REL"
+PLAN_FILE="$PROJECT_DIR/$PLAN_REL"
+
+# ---------------------------------------------------------------------------
+# Logging
+# ---------------------------------------------------------------------------
+: > "$LOG_FILE"
+
+log() {
+  local level="$1"; shift
+  local ts
+  ts="$(date '+%Y-%m-%dT%H:%M:%S%z')"
+  printf '%s [%s] %s\n' "$ts" "$level" "$*" | tee -a "$LOG_FILE"
+}
+
+# ---------------------------------------------------------------------------
+# Validation
+# ---------------------------------------------------------------------------
+if [[ ! -f "$PROMPT_FILE" ]]; then
+  log ERROR "prompt file not found: $PROMPT_FILE"
+  exit 1
+fi
+
+if ! command -v opencode &>/dev/null; then
+  log ERROR "opencode not found in PATH"
+  exit 1
+fi
+
+# ---------------------------------------------------------------------------
+# Reset done file
+# ---------------------------------------------------------------------------
+: > "$DONE_FILE"
+
+# ---------------------------------------------------------------------------
+# Exit checks
+# ---------------------------------------------------------------------------
+check_done_file() {
+  [[ -f "$DONE_FILE" ]] && grep -qi '^DONE$' "$DONE_FILE"
+}
+
+check_plan_complete() {
+  [[ -f "$PLAN_FILE" ]] && ! grep -q '^\s*- \[ \]' "$PLAN_FILE"
+}
+
+# ---------------------------------------------------------------------------
+# Main loop
+# ---------------------------------------------------------------------------
+log INFO "ralph loop starting"
+log INFO "project:    $PROJECT_DIR"
+log INFO "model:      $MODEL"
+log INFO "prompt:     $PROMPT_REL"
+log INFO "plan:       $PLAN_REL"
+log INFO "max:        $MAX_ITERATIONS"
+log INFO "---"
+
+LOOP_COUNT=0
+
+while :; do
+  LOOP_COUNT=$((LOOP_COUNT + 1))
+
+  # --- guard: max iterations ---
+  if [[ "$LOOP_COUNT" -gt "$MAX_ITERATIONS" ]]; then
+    log WARN "max iterations ($MAX_ITERATIONS) reached — exiting"
+    break
+  fi
+
+  # --- guard: done file ---
+  if check_done_file; then
+    log INFO "done file signals DONE — exiting"
+    break
+  fi
+
+  # --- guard: plan complete ---
+  if [[ "$LOOP_COUNT" -gt 1 ]] && check_plan_complete; then
+    log INFO "all plan checkmarks completed — exiting"
+    break
+  fi
+
+  log INFO "[loop $LOOP_COUNT/$MAX_ITERATIONS] starting fresh context"
+
+  PROMPT=$(cat "$PROMPT_FILE")
+  opencode run "$PROMPT" --model "$MODEL" --dir "$PROJECT_DIR" || true
+
+  log INFO "[loop $LOOP_COUNT/$MAX_ITERATIONS] session ended"
+
+  # --- post-iteration check: done file ---
+  if check_done_file; then
+    log INFO "done file signals DONE after loop $LOOP_COUNT — exiting"
+    break
+  fi
+done
+
+log INFO "ralph loop finished after $LOOP_COUNT iteration(s)"
