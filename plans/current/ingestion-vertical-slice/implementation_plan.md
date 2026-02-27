@@ -11,7 +11,7 @@ Goal: first real end-to-end slice: read OpenCode SQLite (read-only) -> ingest in
 ## Task Queue (pick top-most incomplete)
 
 - [x] TDD: `SourceDb` opens `OPENCODE_DB_PATH` read-only + `PRAGMA query_only=ON`
-- [ ] TDD: `SourceDb.listSessionsUpdatedSince(sinceMs)` returns stable, typed rows (at least `id`, `project_id`, `title`, `time_updated`)
+- [x] TDD: `SourceDb.listSessionsUpdatedSince(sinceMs)` returns stable, typed rows (at least `id`, `project_id`, `title`, `time_updated`)
 - [ ] TDD: `DashboardDb` opens `DASHBOARD_DB_PATH` (default `/data/dashboard.db`) and runs migrations
 - [ ] TDD: `DashboardDb` schema v1: `ingestion_cursor`, `sessions` (subset columns ok), unique PKs
 - [ ] TDD: `IngestionService.ingestOnce` copies new/updated sessions using cursor watermark; idempotent upsert

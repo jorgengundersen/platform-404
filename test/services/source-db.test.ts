@@ -2,7 +2,7 @@ import { Database } from "bun:sqlite";
 import { afterAll, beforeAll, describe, expect, test } from "bun:test";
 import * as fs from "node:fs";
 
-import { openSourceDb } from "@/services/source-db";
+import { listSessionsUpdatedSince, openSourceDb } from "@/services/source-db";
 
 describe("openSourceDb", () => {
   let tempDbPath: string;
@@ -55,6 +55,64 @@ describe("openSourceDb", () => {
         "INSERT INTO sessions (id, project_id, title, time_updated) VALUES (999, 999, 'Fail', 999)",
       );
     }).toThrow();
+
+    db.close();
+  });
+});
+
+describe("listSessionsUpdatedSince", () => {
+  let tempDbPath: string;
+
+  beforeAll(() => {
+    // Create a temp directory and test database with multiple sessions
+    tempDbPath = `/tmp/test-listSessions-${Date.now()}.db`;
+
+    const db = new Database(tempDbPath);
+    db.exec(`
+      CREATE TABLE IF NOT EXISTS sessions (
+        id INTEGER PRIMARY KEY,
+        project_id INTEGER,
+        title TEXT,
+        time_updated INTEGER
+      );
+      INSERT INTO sessions (id, project_id, title, time_updated) VALUES
+        (1, 100, 'Session 1', 1000),
+        (2, 101, 'Session 2', 2000),
+        (3, 102, 'Session 3', 3000),
+        (4, 103, 'Session 4', 4000);
+    `);
+    db.close();
+  });
+
+  afterAll(() => {
+    if (fs.existsSync(tempDbPath)) {
+      fs.unlinkSync(tempDbPath);
+    }
+  });
+
+  test("returns sessions updated after sinceMs, ordered by time_updated ascending", () => {
+    const db = openSourceDb(tempDbPath);
+    const sessions = listSessionsUpdatedSince(db, 2000);
+
+    expect(sessions).toHaveLength(3);
+    expect(sessions[0]).toEqual({
+      id: 2,
+      project_id: 101,
+      title: "Session 2",
+      time_updated: 2000,
+    });
+    expect(sessions[1]).toEqual({
+      id: 3,
+      project_id: 102,
+      title: "Session 3",
+      time_updated: 3000,
+    });
+    expect(sessions[2]).toEqual({
+      id: 4,
+      project_id: 103,
+      title: "Session 4",
+      time_updated: 4000,
+    });
 
     db.close();
   });
