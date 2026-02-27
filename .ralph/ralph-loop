@@ -135,8 +135,13 @@ while :; do
     break
   fi
 
+  # --- guard: plan file exists ---
+  if [[ ! -f "$PLAN_FILE" ]]; then
+    log WARN "[loop $LOOP_COUNT] plan file not found: $PLAN_REL — agent should create it"
+  fi
+
   # --- guard: plan complete ---
-  if [[ "$LOOP_COUNT" -gt 1 ]] && check_plan_complete; then
+  if [[ -f "$PLAN_FILE" ]] && [[ "$LOOP_COUNT" -gt 1 ]] && check_plan_complete; then
     log INFO "all plan checkmarks completed — exiting"
     break
   fi
