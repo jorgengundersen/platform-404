@@ -2,7 +2,11 @@ import { Database } from "bun:sqlite";
 import { afterAll, beforeAll, describe, expect, test } from "bun:test";
 import * as fs from "node:fs";
 
-import { listSessionsUpdatedSince, openSourceDb } from "@/services/source-db";
+import {
+  listProjectsByIds,
+  listSessionsUpdatedSince,
+  openSourceDb,
+} from "@/services/source-db";
 
 describe("openSourceDb", () => {
   let tempDbPath: string;
@@ -112,6 +116,51 @@ describe("listSessionsUpdatedSince", () => {
       project_id: "proj-103",
       title: "Session 4",
       time_updated: 4000,
+    });
+
+    db.close();
+  });
+});
+
+describe("listProjectsByIds", () => {
+  let tempDbPath: string;
+
+  beforeAll(() => {
+    // Create a temp directory and test database with projects
+    tempDbPath = `/tmp/test-listProjects-${Date.now()}.db`;
+
+    const db = new Database(tempDbPath);
+    db.exec(`
+      CREATE TABLE IF NOT EXISTS project (
+        id TEXT PRIMARY KEY,
+        name TEXT
+      );
+      INSERT INTO project (id, name) VALUES
+        ('proj-100', 'Project Alpha'),
+        ('proj-101', 'Project Beta'),
+        ('proj-102', 'Project Gamma');
+    `);
+    db.close();
+  });
+
+  afterAll(() => {
+    if (fs.existsSync(tempDbPath)) {
+      fs.unlinkSync(tempDbPath);
+    }
+  });
+
+  test("returns projects by ids with { id, name } for referenced projects", () => {
+    const db = openSourceDb(tempDbPath);
+    const projects = listProjectsByIds(db, ["proj-100", "proj-102"]);
+
+    expect(projects).toHaveLength(2);
+    expect(projects[0]).toEqual({
+      id: "proj-100",
+      name: "Project Alpha",
+    });
+    expect(projects[1]).toEqual({
+      id: "proj-102",
+      name: "Project Gamma",
     });
 
     db.close();

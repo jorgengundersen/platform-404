@@ -12,7 +12,7 @@ Goal: align to real OpenCode SQLite schema (`project`/`session`) and ingest sess
 ## Task Queue (pick top-most incomplete)
 
 - [x] TDD: `SourceDb.listSessionsUpdatedSince` queries OpenCode `session` table (not `sessions`) and returns TEXT ids (`id`, `project_id`, `title`, `time_updated`)
-- [ ] TDD: `SourceDb.listProjectsByIds(ids)` returns `{ id, name }` for referenced projects
+- [x] TDD: `SourceDb.listProjectsByIds(ids)` returns `{ id, name }` for referenced projects
 - [ ] TDD: `DashboardDb` schema v2: sessions uses TEXT ids; add/ensure `project_name` column (migration safe for existing db)
 - [ ] TDD: `IngestionService.ingestOnce` upserts sessions with `project_name` populated via project lookup
 - [ ] TDD: `IngestionService.ingestOnce` cursor watermark advances correctly when multiple sessions share same `time_updated`
