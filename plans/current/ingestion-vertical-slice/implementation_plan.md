@@ -12,7 +12,7 @@ Goal: first real end-to-end slice: read OpenCode SQLite (read-only) -> ingest in
 
 - [x] TDD: `SourceDb` opens `OPENCODE_DB_PATH` read-only + `PRAGMA query_only=ON`
 - [x] TDD: `SourceDb.listSessionsUpdatedSince(sinceMs)` returns stable, typed rows (at least `id`, `project_id`, `title`, `time_updated`)
-- [ ] TDD: `DashboardDb` opens `DASHBOARD_DB_PATH` (default `/data/dashboard.db`) and runs migrations
+- [x] TDD: `DashboardDb` opens `DASHBOARD_DB_PATH` (default `/data/dashboard.db`) and runs migrations
 - [ ] TDD: `DashboardDb` schema v1: `ingestion_cursor`, `sessions` (subset columns ok), unique PKs
 - [ ] TDD: `IngestionService.ingestOnce` copies new/updated sessions using cursor watermark; idempotent upsert
 - [ ] TDD: `GET /api/stats/overview` returns `{ data: { totalSessions: number } }` backed by `dashboard.db`
@@ -34,7 +34,7 @@ Goal: first real end-to-end slice: read OpenCode SQLite (read-only) -> ingest in
 - `bun run validate` green
 
 ## Discoveries
-- (none yet)
+- Assumption: migration schema minimal; align columns to architecture during schema v1 task.
 
 ## Bugs
-(none reported yet)
+- DashboardDb migration columns differ from architecture spec; fix during schema v1 task.
