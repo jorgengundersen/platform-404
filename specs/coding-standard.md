@@ -30,6 +30,10 @@
 - No classes except for Effect `Context.Tag` declarations.
 - No `null` - use `Option` from Effect or `undefined`.
 - No exceptions - use Effect's error channel.
+
+### Fail Fast
+
+- Validate required runtime config at startup in `src/config.ts` and throw early when missing/invalid.
 - No enums - use string literal unions or `@effect/schema` literals.
 - Exhaustive switch via `never` check in default case.
 

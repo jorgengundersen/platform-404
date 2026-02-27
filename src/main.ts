@@ -1,6 +1,7 @@
 import { healthHandler } from "@/api/health";
-import { rootHandler, staticStylesHandler } from "@/ui/routes";
+import { getConfig } from "@/config";
 import { getPort } from "@/primitives/port";
+import { rootHandler, staticStylesHandler } from "@/ui/routes";
 
 /**
  * boot - Starts the web server
@@ -9,6 +10,8 @@ import { getPort } from "@/primitives/port";
  * Pure function with no side effects on import.
  */
 export async function boot(): Promise<void> {
+  // Fail fast on missing/invalid required config.
+  void getConfig();
   const port = getPort();
 
   const server = Bun.serve({

@@ -43,7 +43,9 @@ opencode.db (read-only) --> Ingestion Service --> dashboard.db (read-write) --> 
 
 ## OpenCode Database (Source - Read Only)
 
-Location: `$XDG_DATA_HOME/opencode/opencode.db` (`/home/devuser/.local/share/opencode/opencode.db`)
+Location: configured in `src/config.ts`.
+
+Fail fast: app throws on startup if `OPENCODE_DB_PATH` is missing/invalid.
 
 ### Schema (from OpenCode source)
 
@@ -289,7 +291,7 @@ CMD ["bun", "run", "src/main.ts"]
 
 | Volume | Mount | Purpose |
 |--------|-------|---------|
-| `devenv-data` | `/mnt/devenv-data` (read-only) | Access to opencode.db |
+| `devenv-data` | (any path, read-only) | Access to opencode.db |
 | `platform-404-data` | `/data` | Dashboard's own database |
 
 ### Environment Variables
@@ -297,7 +299,7 @@ CMD ["bun", "run", "src/main.ts"]
 | Variable | Default | Description |
 |----------|---------|-------------|
 | `PORT` | `3000` | HTTP server port |
-| `OPENCODE_DB_PATH` | `/mnt/devenv-data/opencode/opencode.db` | Path to opencode database |
+| `OPENCODE_DB_PATH` | (required) | Path to opencode database |
 | `DASHBOARD_DB_PATH` | `/data/dashboard.db` | Path to dashboard database |
 | `SYNC_INTERVAL_MS` | `30000` | Ingestion sync interval |
 
@@ -313,6 +315,7 @@ CMD ["bun", "run", "src/main.ts"]
 ## Error Handling
 
 - Effect's structured error handling throughout services
-- Source DB unavailable: dashboard continues serving cached data, logs warning
+- Fail fast on startup if required config is missing/invalid (e.g. `OPENCODE_DB_PATH`)
+- Source DB unavailable (runtime): log + retry on next sync interval
 - Ingestion failures: logged, retried on next interval, cursor not advanced
 - API errors: proper HTTP status codes + JSON error bodies
