@@ -82,3 +82,4 @@ These exist only to prove the TDD loop works end-to-end. Replace with real primi
 - [x] `bun init` creates `index.ts`, `README.md`, `tsconfig.json`, `package.json`, `bun.lock`.
 - [x] `bun test` fails when no test files exist.
 - [x] `bun test` errors when no matching test files.
+- [x] `bun test` errors when no matching test files (re-verified while adding scripts).
