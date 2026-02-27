@@ -16,7 +16,7 @@ Goal: first real end-to-end slice: read OpenCode SQLite (read-only) -> ingest in
 - [x] TDD: `DashboardDb` schema v1: `ingestion_cursor`, `sessions` (subset columns ok), unique PKs
 - [x] TDD: `IngestionService.ingestOnce` copies new/updated sessions using cursor watermark; idempotent upsert
 - [x] TDD: `GET /api/stats/overview` returns `{ data: { totalSessions: number } }` backed by `dashboard.db`
-- [ ] TDD: `GET /api/health` includes `{ data: { status: "ok", lastSync: number | null } }`
+- [x] TDD: `GET /api/health` includes `{ data: { status: "ok", lastSync: number | null } }`
 
 ## Target Structure (only as needed by tasks)
 - `src/services/source-db.ts`
