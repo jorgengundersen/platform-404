@@ -91,6 +91,11 @@ if ! command -v opencode &>/dev/null; then
   exit 1
 fi
 
+if ! [[ "$MAX_ITERATIONS" =~ ^[0-9]+$ ]] || [[ "$MAX_ITERATIONS" -lt 1 ]]; then
+  log ERROR "max iterations must be a positive integer: $MAX_ITERATIONS"
+  exit 1
+fi
+
 # ---------------------------------------------------------------------------
 # Reset done file
 # ---------------------------------------------------------------------------
@@ -118,20 +123,15 @@ log INFO "plan:       $PLAN_REL"
 log INFO "max:        $MAX_ITERATIONS"
 log INFO "---"
 
-LOOP_COUNT=0
+SESSIONS_RUN=0
+EXIT_REASON=""
 
-while :; do
-  LOOP_COUNT=$((LOOP_COUNT + 1))
-
-  # --- guard: max iterations ---
-  if [[ "$LOOP_COUNT" -gt "$MAX_ITERATIONS" ]]; then
-    log WARN "max iterations ($MAX_ITERATIONS) reached — exiting"
-    break
-  fi
+for ((LOOP_COUNT=1; LOOP_COUNT<=MAX_ITERATIONS; LOOP_COUNT++)); do
 
   # --- guard: done file ---
   if check_done_file; then
     log INFO "done file signals DONE — exiting"
+    EXIT_REASON="done"
     break
   fi
 
@@ -143,6 +143,7 @@ while :; do
   # --- guard: plan complete ---
   if [[ -f "$PLAN_FILE" ]] && [[ "$LOOP_COUNT" -gt 1 ]] && check_plan_complete; then
     log INFO "all plan checkmarks completed — exiting"
+    EXIT_REASON="plan_complete"
     break
   fi
 
@@ -153,11 +154,19 @@ while :; do
 
   log INFO "[loop $LOOP_COUNT/$MAX_ITERATIONS] session ended"
 
+  SESSIONS_RUN=$((SESSIONS_RUN + 1))
+
   # --- post-iteration check: done file ---
   if check_done_file; then
     log INFO "done file signals DONE after loop $LOOP_COUNT — exiting"
+    EXIT_REASON="done"
     break
   fi
 done
 
-log INFO "ralph loop finished after $LOOP_COUNT iteration(s)"
+if [[ -z "$EXIT_REASON" ]] && [[ "$SESSIONS_RUN" -ge "$MAX_ITERATIONS" ]]; then
+  log WARN "max iterations ($MAX_ITERATIONS) reached — exiting"
+  EXIT_REASON="max"
+fi
+
+log INFO "ralph loop finished after $SESSIONS_RUN iteration(s)"
