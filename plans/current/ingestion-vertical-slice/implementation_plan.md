@@ -14,7 +14,7 @@ Goal: first real end-to-end slice: read OpenCode SQLite (read-only) -> ingest in
 - [x] TDD: `SourceDb.listSessionsUpdatedSince(sinceMs)` returns stable, typed rows (at least `id`, `project_id`, `title`, `time_updated`)
 - [x] TDD: `DashboardDb` opens `DASHBOARD_DB_PATH` (default `/data/dashboard.db`) and runs migrations
 - [x] TDD: `DashboardDb` schema v1: `ingestion_cursor`, `sessions` (subset columns ok), unique PKs
-- [ ] TDD: `IngestionService.ingestOnce` copies new/updated sessions using cursor watermark; idempotent upsert
+- [x] TDD: `IngestionService.ingestOnce` copies new/updated sessions using cursor watermark; idempotent upsert
 - [ ] TDD: `GET /api/stats/overview` returns `{ data: { totalSessions: number } }` backed by `dashboard.db`
 - [ ] TDD: `GET /api/health` includes `{ data: { status: "ok", lastSync: number | null } }`
 
