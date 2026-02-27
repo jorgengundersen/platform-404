@@ -26,7 +26,7 @@ Establish the testing facility so red/green TDD can begin. Pre-commit hook enfor
 - [x] Seed TDD cycle: `math.add` (prove red/green works end-to-end)
   - [x] Red: `test/primitives/math.test.ts` fails for the right reason; run `bun test`
   - [x] Green: `src/primitives/math.ts` minimal `add` implementation; run `bun test`
-- [ ] Run full validation: `bun run validate`
+- [x] Run full validation: `bun run validate`
 - [x] Install lefthook: `bun add -d lefthook` (`package.json`)
 - [x] Create `lefthook.yml` -- pre-commit config (`lefthook.yml`)
 - [ ] `lefthook install` -- activate git hook (`.git/hooks/pre-commit`)
@@ -84,3 +84,5 @@ These exist only to prove the TDD loop works end-to-end. Replace with real primi
 - [x] `bun test` errors when no matching test files.
 - [x] `bun test` errors when no matching test files (re-verified while adding scripts).
 - [x] Scripts in `package.json` already match plan item but checkbox still unchecked.
+- [x] `bun run validate` fails when biome format check fails.
+- [x] `bun run validate` currently fails due to `opencode/opencode.jsonc` and `index.ts` formatting.
