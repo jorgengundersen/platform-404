@@ -1,6 +1,7 @@
 import { Database } from "bun:sqlite";
 
 const DEFAULT_DASHBOARD_DB_PATH = "/data/dashboard.db";
+const DASHBOARD_DB_PATH_ENV = "DASHBOARD_DB_PATH";
 
 /**
  * openDashboardDb - Opens the dashboard database and runs migrations
@@ -9,7 +10,12 @@ const DEFAULT_DASHBOARD_DB_PATH = "/data/dashboard.db";
  * @returns Database instance
  */
 export function openDashboardDb(dbPath?: string): Database {
-  const path = dbPath ?? DEFAULT_DASHBOARD_DB_PATH;
+  const fromEnv = process.env[DASHBOARD_DB_PATH_ENV];
+  const envPath = fromEnv?.trim();
+  const path =
+    dbPath ??
+    (envPath && envPath.length > 0 ? envPath : undefined) ??
+    DEFAULT_DASHBOARD_DB_PATH;
   const db = new Database(path);
 
   ensureMigrations(db);
