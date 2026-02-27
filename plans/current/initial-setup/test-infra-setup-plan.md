@@ -23,9 +23,9 @@ Establish the testing facility so red/green TDD can begin. Pre-commit hook enfor
 - [x] Create `biome.json` -- formatting + lint rules (no `any`, etc.) (`biome.json`)
 - [x] Scaffold dirs: `src/{primitives,services,api,ui}`, `test/{primitives,services,api}` (dirs)
 - [ ] Add npm scripts: `typecheck`, `lint`, `format`, `format:check`, `check`, `test`, `validate` (`package.json`)
-- [ ] Seed TDD cycle: `math.add` (prove red/green works end-to-end)
-  - [ ] Red: `test/primitives/math.test.ts` fails for the right reason; run `bun test`
-  - [ ] Green: `src/primitives/math.ts` minimal `add` implementation; run `bun test`
+- [x] Seed TDD cycle: `math.add` (prove red/green works end-to-end)
+  - [x] Red: `test/primitives/math.test.ts` fails for the right reason; run `bun test`
+  - [x] Green: `src/primitives/math.ts` minimal `add` implementation; run `bun test`
 - [ ] Run full validation: `bun run validate`
 - [ ] Install lefthook: `bun add -d lefthook` (`package.json`)
 - [ ] Create `lefthook.yml` -- pre-commit config (`lefthook.yml`)
