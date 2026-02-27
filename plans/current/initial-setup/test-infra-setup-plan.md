@@ -30,16 +30,16 @@ Establish the testing facility so red/green TDD can begin. Pre-commit hook enfor
 - [x] Install lefthook: `bun add -d lefthook` (`package.json`)
 - [x] Create `lefthook.yml` -- pre-commit config (`lefthook.yml`)
 - [x] `lefthook install` -- activate git hook (`.git/hooks/pre-commit`)
-- [ ] Verify: test commit triggers all 4 checks
+- [x] Verify: test commit triggers all 4 checks
 
 ## Pre-commit Hook (lefthook)
 
 Runs sequentially, fails fast:
 
-- [ ] `bun run format:check` -- Biome formatting
-- [ ] `bun run lint` -- Biome linting
-- [ ] `bun run typecheck` -- `tsc --noEmit`
-- [ ] `bun test` -- all tests
+- [x] `bun run format:check` -- Biome formatting
+- [x] `bun run lint` -- Biome linting
+- [x] `bun run typecheck` -- `tsc --noEmit`
+- [x] `bun test` -- all tests
 
 ## package.json Scripts
 

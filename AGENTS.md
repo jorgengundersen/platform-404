@@ -5,3 +5,4 @@
 - `bun test` fails if no test files.
 - lefthook config lives in `lefthook.yml` with pre-commit jobs.
 - `bun run validate` fails if biome format check fails.
+- lefthook pre-commit runs format:check, lint, typecheck, test.
