@@ -11,18 +11,18 @@ describe("openSourceDb", () => {
     // Create a temp directory and minimal test database
     tempDbPath = `/tmp/test-opencode-${Date.now()}.db`;
 
-    // Create a minimal OpenCode database with sessions table
+    // Create a minimal OpenCode database with session table (TEXT ids)
     const db = new Database(tempDbPath);
     db.exec(`
-      CREATE TABLE IF NOT EXISTS sessions (
-        id INTEGER PRIMARY KEY,
-        project_id INTEGER,
+      CREATE TABLE IF NOT EXISTS session (
+        id TEXT PRIMARY KEY,
+        project_id TEXT,
         title TEXT,
         time_updated INTEGER
       );
-      INSERT INTO sessions (id, project_id, title, time_updated) VALUES
-        (1, 100, 'Test Session 1', 1000000),
-        (2, 101, 'Test Session 2', 1000001);
+      INSERT INTO session (id, project_id, title, time_updated) VALUES
+        ('sess-1', 'proj-100', 'Test Session 1', 1000000),
+        ('sess-2', 'proj-101', 'Test Session 2', 1000001);
     `);
     db.close();
   });
@@ -44,7 +44,7 @@ describe("openSourceDb", () => {
 
     // Verify we can query
     const sessionsResult = db
-      .query("SELECT COUNT(*) as count FROM sessions")
+      .query("SELECT COUNT(*) as count FROM session")
       .get() as { count: number };
     expect(sessionsResult.count).toBe(2);
 
@@ -52,7 +52,7 @@ describe("openSourceDb", () => {
     db.exec("PRAGMA query_only=OFF");
     expect(() => {
       db.exec(
-        "INSERT INTO sessions (id, project_id, title, time_updated) VALUES (999, 999, 'Fail', 999)",
+        "INSERT INTO session (id, project_id, title, time_updated) VALUES ('sess-999', 'proj-999', 'Fail', 999)",
       );
     }).toThrow();
 
@@ -69,17 +69,17 @@ describe("listSessionsUpdatedSince", () => {
 
     const db = new Database(tempDbPath);
     db.exec(`
-      CREATE TABLE IF NOT EXISTS sessions (
-        id INTEGER PRIMARY KEY,
-        project_id INTEGER,
+      CREATE TABLE IF NOT EXISTS session (
+        id TEXT PRIMARY KEY,
+        project_id TEXT,
         title TEXT,
         time_updated INTEGER
       );
-      INSERT INTO sessions (id, project_id, title, time_updated) VALUES
-        (1, 100, 'Session 1', 1000),
-        (2, 101, 'Session 2', 2000),
-        (3, 102, 'Session 3', 3000),
-        (4, 103, 'Session 4', 4000);
+      INSERT INTO session (id, project_id, title, time_updated) VALUES
+        ('sess-1', 'proj-100', 'Session 1', 1000),
+        ('sess-2', 'proj-101', 'Session 2', 2000),
+        ('sess-3', 'proj-102', 'Session 3', 3000),
+        ('sess-4', 'proj-103', 'Session 4', 4000);
     `);
     db.close();
   });
@@ -90,26 +90,26 @@ describe("listSessionsUpdatedSince", () => {
     }
   });
 
-  test("returns sessions updated after sinceMs, ordered by time_updated ascending", () => {
+  test("returns sessions updated after sinceMs from session table with TEXT ids, ordered by time_updated ascending", () => {
     const db = openSourceDb(tempDbPath);
     const sessions = listSessionsUpdatedSince(db, 2000);
 
     expect(sessions).toHaveLength(3);
     expect(sessions[0]).toEqual({
-      id: 2,
-      project_id: 101,
+      id: "sess-2",
+      project_id: "proj-101",
       title: "Session 2",
       time_updated: 2000,
     });
     expect(sessions[1]).toEqual({
-      id: 3,
-      project_id: 102,
+      id: "sess-3",
+      project_id: "proj-102",
       title: "Session 3",
       time_updated: 3000,
     });
     expect(sessions[2]).toEqual({
-      id: 4,
-      project_id: 103,
+      id: "sess-4",
+      project_id: "proj-103",
       title: "Session 4",
       time_updated: 4000,
     });

@@ -14,16 +14,16 @@ describe("IngestionService.ingestOnce", () => {
     tempSourceDbPath = `/tmp/test-source-ingestion-${Date.now()}.db`;
     const sourceDb = new Database(tempSourceDbPath);
     sourceDb.exec(`
-      CREATE TABLE IF NOT EXISTS sessions (
-        id INTEGER PRIMARY KEY,
-        project_id INTEGER,
+      CREATE TABLE IF NOT EXISTS session (
+        id TEXT PRIMARY KEY,
+        project_id TEXT,
         title TEXT,
         time_updated INTEGER
       );
-      INSERT INTO sessions (id, project_id, title, time_updated) VALUES
-        (1, 100, 'Session 1', 1000),
-        (2, 101, 'Session 2', 2000),
-        (3, 102, 'Session 3', 3000);
+      INSERT INTO session (id, project_id, title, time_updated) VALUES
+        ('sess-1', 'proj-100', 'Session 1', 1000),
+        ('sess-2', 'proj-101', 'Session 2', 2000),
+        ('sess-3', 'proj-102', 'Session 3', 3000);
     `);
     sourceDb.close();
 
@@ -60,9 +60,12 @@ describe("IngestionService.ingestOnce", () => {
     }>;
 
     expect(sessions).toHaveLength(3);
+    expect(sessions[0]?.id).toBe("sess-1");
     expect(sessions[0]?.title).toBe("Session 1");
     expect(sessions[0]?.time_updated).toBe(1000);
+    expect(sessions[1]?.id).toBe("sess-2");
     expect(sessions[1]?.title).toBe("Session 2");
+    expect(sessions[2]?.id).toBe("sess-3");
     expect(sessions[2]?.title).toBe("Session 3");
 
     // Verify cursor was updated
