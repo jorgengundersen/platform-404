@@ -1,4 +1,5 @@
 import { healthHandler } from "@/api/health";
+import { statsOverviewHandler } from "@/api/stats";
 import { getConfig } from "@/config";
 import { getPort } from "@/primitives/port";
 import { rootHandler, staticStylesHandler } from "@/ui/routes";
@@ -21,6 +22,10 @@ export async function boot(): Promise<void> {
 
       if (url.pathname === "/api/health") {
         return healthHandler(req);
+      }
+
+      if (url.pathname === "/api/stats/overview") {
+        return statsOverviewHandler(req);
       }
 
       if (url.pathname === "/static/styles.css") {
