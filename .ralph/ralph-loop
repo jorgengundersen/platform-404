@@ -149,7 +149,7 @@ while :; do
   log INFO "[loop $LOOP_COUNT/$MAX_ITERATIONS] starting fresh context"
 
   PROMPT=$(cat "$PROMPT_FILE")
-  opencode run "$PROMPT" --model "$MODEL" --dir "$PROJECT_DIR" || true
+  opencode run "$PROMPT" --model "$MODEL" --dir "$PROJECT_DIR" --thinking "true" || true
 
   log INFO "[loop $LOOP_COUNT/$MAX_ITERATIONS] session ended"
 

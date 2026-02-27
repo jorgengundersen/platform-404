@@ -1,3 +1,5 @@
 - Be extremely concise and sacrifice grammar for the sake of concision.
 - red/green TDD for any development. ONE test and ONE implementation. No bulk-test and bulk-implementation
-
+- Any plans created must use markdown checklists: `- [ ]`.
+- `bun init` creates `index.ts`, `README.md`, `tsconfig.json`, `package.json`, `bun.lock`.
+- `bun test` fails if no test files.
