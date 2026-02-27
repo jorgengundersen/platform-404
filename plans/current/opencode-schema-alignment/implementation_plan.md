@@ -14,7 +14,7 @@ Goal: align to real OpenCode SQLite schema (`project`/`session`) and ingest sess
 - [x] TDD: `SourceDb.listSessionsUpdatedSince` queries OpenCode `session` table (not `sessions`) and returns TEXT ids (`id`, `project_id`, `title`, `time_updated`)
 - [x] TDD: `SourceDb.listProjectsByIds(ids)` returns `{ id, name }` for referenced projects
 - [ ] TDD: `DashboardDb` schema v2: sessions uses TEXT ids; add/ensure `project_name` column (migration safe for existing db)
-- [ ] TDD: `IngestionService.ingestOnce` upserts sessions with `project_name` populated via project lookup
+- [x] TDD: `IngestionService.ingestOnce` upserts sessions with `project_name` populated via project lookup
 - [ ] TDD: `IngestionService.ingestOnce` cursor watermark advances correctly when multiple sessions share same `time_updated`
 - [ ] TDD: `/api/stats/overview` still returns correct `totalSessions` after schema alignment + ingestion
 
@@ -35,7 +35,7 @@ Goal: align to real OpenCode SQLite schema (`project`/`session`) and ingest sess
 - `bun run validate` green
 
 ## Discoveries
-- (none yet)
+- Assumption: DashboardDb sessions schema already v2 (TEXT id, project_name column, migration safe).
 
 ## Bugs
 - (none yet)

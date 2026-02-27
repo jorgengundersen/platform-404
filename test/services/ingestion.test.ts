@@ -10,7 +10,7 @@ describe("IngestionService.ingestOnce", () => {
   let tempDashboardDbPath: string;
 
   beforeAll(() => {
-    // Create temp source database with sessions
+    // Create temp source database with sessions and projects
     tempSourceDbPath = `/tmp/test-source-ingestion-${Date.now()}.db`;
     const sourceDb = new Database(tempSourceDbPath);
     sourceDb.exec(`
@@ -20,10 +20,18 @@ describe("IngestionService.ingestOnce", () => {
         title TEXT,
         time_updated INTEGER
       );
+      CREATE TABLE IF NOT EXISTS project (
+        id TEXT PRIMARY KEY,
+        name TEXT
+      );
       INSERT INTO session (id, project_id, title, time_updated) VALUES
         ('sess-1', 'proj-100', 'Session 1', 1000),
         ('sess-2', 'proj-101', 'Session 2', 2000),
         ('sess-3', 'proj-102', 'Session 3', 3000);
+      INSERT INTO project (id, name) VALUES
+        ('proj-100', 'Project Alpha'),
+        ('proj-101', 'Project Beta'),
+        ('proj-102', 'Project Gamma');
     `);
     sourceDb.close();
 
@@ -50,11 +58,12 @@ describe("IngestionService.ingestOnce", () => {
     // Verify sessions were copied
     const sessions = dashboardDb
       .query(
-        "SELECT id, project_id, title, time_updated FROM sessions ORDER BY time_updated ASC",
+        "SELECT id, project_id, project_name, title, time_updated FROM sessions ORDER BY time_updated ASC",
       )
       .all() as Array<{
       id: string;
       project_id: string;
+      project_name: string;
       title: string;
       time_updated: number;
     }>;
@@ -63,10 +72,13 @@ describe("IngestionService.ingestOnce", () => {
     expect(sessions[0]?.id).toBe("sess-1");
     expect(sessions[0]?.title).toBe("Session 1");
     expect(sessions[0]?.time_updated).toBe(1000);
+    expect(sessions[0]?.project_name).toBe("Project Alpha");
     expect(sessions[1]?.id).toBe("sess-2");
     expect(sessions[1]?.title).toBe("Session 2");
+    expect(sessions[1]?.project_name).toBe("Project Beta");
     expect(sessions[2]?.id).toBe("sess-3");
     expect(sessions[2]?.title).toBe("Session 3");
+    expect(sessions[2]?.project_name).toBe("Project Gamma");
 
     // Verify cursor was updated
     const cursor = dashboardDb

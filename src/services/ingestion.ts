@@ -1,5 +1,8 @@
 import type { Database } from "bun:sqlite";
-import { listSessionsUpdatedSince } from "@/services/source-db";
+import {
+  listProjectsByIds,
+  listSessionsUpdatedSince,
+} from "@/services/source-db";
 
 /**
  * ingestOnce - Copies sessions from source database to dashboard database
@@ -23,6 +26,11 @@ export function ingestOnce(sourceDb: Database, dashboardDb: Database): void {
     return; // Nothing to ingest
   }
 
+  // Fetch unique project IDs and get their names
+  const projectIds = Array.from(new Set(sessions.map((s) => s.project_id)));
+  const projects = listProjectsByIds(sourceDb, projectIds);
+  const projectNameMap = new Map(projects.map((p) => [p.id, p.name]));
+
   // Single timestamp for both time_ingested and last_synced_at
   const now = Date.now();
 
@@ -32,13 +40,15 @@ export function ingestOnce(sourceDb: Database, dashboardDb: Database): void {
   try {
     // Upsert sessions into dashboard (idempotent via id primary key)
     const upsertStmt = dashboardDb.prepare(
-      "INSERT INTO sessions (id, project_id, title, time_updated, time_ingested) VALUES (?, ?, ?, ?, ?) ON CONFLICT(id) DO UPDATE SET project_id = excluded.project_id, title = excluded.title, time_updated = excluded.time_updated, time_ingested = excluded.time_ingested",
+      "INSERT INTO sessions (id, project_id, project_name, title, time_updated, time_ingested) VALUES (?, ?, ?, ?, ?, ?) ON CONFLICT(id) DO UPDATE SET project_id = excluded.project_id, project_name = excluded.project_name, title = excluded.title, time_updated = excluded.time_updated, time_ingested = excluded.time_ingested",
     );
 
     for (const session of sessions) {
+      const projectName = projectNameMap.get(session.project_id) ?? null;
       upsertStmt.run(
         session.id,
         session.project_id,
+        projectName,
         session.title,
         session.time_updated,
         now,

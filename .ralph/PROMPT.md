@@ -3,7 +3,7 @@
 Review @specs/README.md to get an Spec overview
 Review @AGENTS.md for coding standards.
 
-Plan: @plans/current/initial-setup/implementation_plan.md
+Plan: @plans/current/opencode-schema-alignment/implementation_plan.md
 Study it.
 
 Choose the most important ONE item from the plan and implement it.
