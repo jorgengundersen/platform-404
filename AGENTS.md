@@ -3,3 +3,4 @@
 - Any plans created must use markdown checklists: `- [ ]`.
 - `bun init` creates `index.ts`, `README.md`, `tsconfig.json`, `package.json`, `bun.lock`.
 - `bun test` fails if no test files.
+- lefthook config lives in `lefthook.yml` with pre-commit jobs.

@@ -28,7 +28,7 @@ Establish the testing facility so red/green TDD can begin. Pre-commit hook enfor
   - [x] Green: `src/primitives/math.ts` minimal `add` implementation; run `bun test`
 - [ ] Run full validation: `bun run validate`
 - [x] Install lefthook: `bun add -d lefthook` (`package.json`)
-- [ ] Create `lefthook.yml` -- pre-commit config (`lefthook.yml`)
+- [x] Create `lefthook.yml` -- pre-commit config (`lefthook.yml`)
 - [ ] `lefthook install` -- activate git hook (`.git/hooks/pre-commit`)
 - [ ] Verify: test commit triggers all 4 checks
 
