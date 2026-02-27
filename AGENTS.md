@@ -6,3 +6,4 @@
 - lefthook config lives in `lefthook.yml` with pre-commit jobs.
 - `bun run validate` fails if biome format check fails.
 - lefthook pre-commit runs format:check, lint, typecheck, test.
+- Env var tests require try/finally cleanup: save original, restore after to prevent cross-test pollution.
