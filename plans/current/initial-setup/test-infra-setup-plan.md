@@ -21,7 +21,7 @@ Establish the testing facility so red/green TDD can begin. Pre-commit hook enfor
 - [x] Install dev deps: `typescript`, `@types/bun`, `@biomejs/biome` (`package.json`, `bun.lock`)
 - [x] Create `tsconfig.json` -- strict, path aliases `@/*`, Bun-compatible (`tsconfig.json`)
 - [x] Create `biome.json` -- formatting + lint rules (no `any`, etc.) (`biome.json`)
-- [ ] Scaffold dirs: `src/{primitives,services,api,ui}`, `test/{primitives,services,api}` (dirs)
+- [x] Scaffold dirs: `src/{primitives,services,api,ui}`, `test/{primitives,services,api}` (dirs)
 - [ ] Add npm scripts: `typecheck`, `lint`, `format`, `format:check`, `check`, `test`, `validate` (`package.json`)
 - [ ] Seed TDD cycle: `math.add` (prove red/green works end-to-end)
   - [ ] Red: `test/primitives/math.test.ts` fails for the right reason; run `bun test`
@@ -81,3 +81,4 @@ These exist only to prove the TDD loop works end-to-end. Replace with real primi
 
 - [x] `bun init` creates `index.ts`, `README.md`, `tsconfig.json`, `package.json`, `bun.lock`.
 - [x] `bun test` fails when no test files exist.
+- [x] `bun test` errors when no matching test files.
