@@ -1,3 +1,4 @@
+import { Database } from "bun:sqlite";
 import { afterAll, beforeAll, describe, expect, test } from "bun:test";
 import * as fs from "node:fs";
 
@@ -109,5 +110,83 @@ describe("openDashboardDb", () => {
     expect(idCol?.pk).toBe(1);
 
     db.close();
+  });
+
+  test("schema v2: migrates old sessions table (id INTEGER, no project_name) to v2 (id TEXT, project_name)", () => {
+    const testDbPath = `/tmp/test-dashboard-v1-${Date.now()}.db`;
+    try {
+      // Create old v1 schema with id as INTEGER
+      const oldDb = new Database(testDbPath);
+      oldDb.exec(`
+        CREATE TABLE sessions (
+          id INTEGER PRIMARY KEY,
+          project_id TEXT,
+          title TEXT,
+          version TEXT,
+          summary_additions INTEGER,
+          summary_deletions INTEGER,
+          summary_files INTEGER,
+          message_count INTEGER,
+          total_cost REAL,
+          total_tokens_input INTEGER,
+          total_tokens_output INTEGER,
+          total_tokens_reasoning INTEGER,
+          total_cache_read INTEGER,
+          total_cache_write INTEGER,
+          time_created INTEGER,
+          time_updated INTEGER,
+          time_ingested INTEGER
+        );
+      `);
+
+      // Insert a row with old schema
+      oldDb
+        .prepare(`
+        INSERT INTO sessions (
+          id, project_id, title, version, summary_additions, summary_deletions, 
+          summary_files, message_count, total_cost, total_tokens_input, 
+          total_tokens_output, total_tokens_reasoning, total_cache_read, 
+          total_cache_write, time_created, time_updated, time_ingested
+        ) VALUES (123, 'proj1', 'Test', 'v1', 1, 2, 3, 4, 5.0, 6, 7, 8, 9, 10, 11, 12, 13);
+      `)
+        .run();
+
+      oldDb.close();
+
+      // Open with migration
+      const db = openDashboardDb(testDbPath);
+
+      // Verify sessions table has project_name column
+      const columns = db.query("PRAGMA table_info(sessions)").all() as Array<{
+        name: string;
+        type: string;
+        pk: number;
+      }>;
+      const columnNames = columns.map((c) => c.name);
+      expect(columnNames).toContain("project_name");
+
+      // Verify id is TEXT
+      const idCol = columns.find((c) => c.name === "id");
+      expect(idCol?.type).toBe("TEXT");
+
+      // Verify existing row preserved with id as string
+      const row = db
+        .prepare("SELECT id, project_id, title FROM sessions LIMIT 1")
+        .get() as {
+        id: string;
+        project_id: string;
+        title: string;
+      } | null;
+      expect(row).not.toBeNull();
+      expect(row?.id).toBe("123");
+      expect(row?.project_id).toBe("proj1");
+      expect(row?.title).toBe("Test");
+
+      db.close();
+    } finally {
+      if (fs.existsSync(testDbPath)) {
+        fs.unlinkSync(testDbPath);
+      }
+    }
   });
 });
