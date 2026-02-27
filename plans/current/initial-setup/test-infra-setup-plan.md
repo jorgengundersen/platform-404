@@ -18,7 +18,7 @@ Establish the testing facility so red/green TDD can begin. Pre-commit hook enfor
 
 - [x] `bun init` (`package.json`)
 - [x] Install runtime deps: `effect`, `@effect/platform`, `@effect/platform-bun`, `@effect/schema`, `@effect/sql`, `@effect/sql-sqlite-bun` (`package.json`, `bun.lock`)
-- [ ] Install dev deps: `typescript`, `@types/bun`, `@biomejs/biome` (`package.json`, `bun.lock`)
+- [x] Install dev deps: `typescript`, `@types/bun`, `@biomejs/biome` (`package.json`, `bun.lock`)
 - [ ] Create `tsconfig.json` -- strict, path aliases `@/*`, Bun-compatible (`tsconfig.json`)
 - [ ] Create `biome.json` -- formatting + lint rules (no `any`, etc.) (`biome.json`)
 - [ ] Scaffold dirs: `src/{primitives,services,api,ui}`, `test/{primitives,services,api}` (dirs)
