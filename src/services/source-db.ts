@@ -39,7 +39,7 @@ export function listSessionsUpdatedSince(
   sinceMs: number,
 ): SessionRow[] {
   const query = db.query(
-    "SELECT id, project_id, title, time_updated FROM session WHERE time_updated >= ? ORDER BY time_updated ASC",
+    "SELECT id, project_id, title, time_updated FROM session WHERE time_updated > ? ORDER BY time_updated ASC",
   );
   const rows = query.all(sinceMs) as SessionRow[];
   return rows;

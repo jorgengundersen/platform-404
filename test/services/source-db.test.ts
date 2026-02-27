@@ -98,20 +98,14 @@ describe("listSessionsUpdatedSince", () => {
     const db = openSourceDb(tempDbPath);
     const sessions = listSessionsUpdatedSince(db, 2000);
 
-    expect(sessions).toHaveLength(3);
+    expect(sessions).toHaveLength(2);
     expect(sessions[0]).toEqual({
-      id: "sess-2",
-      project_id: "proj-101",
-      title: "Session 2",
-      time_updated: 2000,
-    });
-    expect(sessions[1]).toEqual({
       id: "sess-3",
       project_id: "proj-102",
       title: "Session 3",
       time_updated: 3000,
     });
-    expect(sessions[2]).toEqual({
+    expect(sessions[1]).toEqual({
       id: "sess-4",
       project_id: "proj-103",
       title: "Session 4",

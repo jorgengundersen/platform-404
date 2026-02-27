@@ -17,7 +17,7 @@ export function ingestOnce(sourceDb: Database, dashboardDb: Database): void {
     .query("SELECT last_time_updated FROM ingestion_cursor WHERE source = ?")
     .get("opencode_session") as { last_time_updated: number } | null;
 
-  const sinceMs = cursorRow?.last_time_updated ?? 0;
+  const sinceMs = cursorRow?.last_time_updated ?? -1;
 
   // Fetch all sessions from source updated since cursor
   const sessions = listSessionsUpdatedSince(sourceDb, sinceMs);

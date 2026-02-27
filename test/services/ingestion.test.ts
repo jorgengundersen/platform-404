@@ -103,4 +103,83 @@ describe("IngestionService.ingestOnce", () => {
     sourceDb.close();
     dashboardDb.close();
   });
+
+  test("ingestOnce cursor watermark advances correctly when multiple sessions share same time_updated", () => {
+    // Setup: Create source db with duplicate time_updated values
+    const tempSourceDbPath2 = `/tmp/test-source-dup-${Date.now()}.db`;
+    const sourceDb2 = new Database(tempSourceDbPath2);
+    sourceDb2.exec(`
+      CREATE TABLE IF NOT EXISTS session (
+        id TEXT PRIMARY KEY,
+        project_id TEXT,
+        title TEXT,
+        time_updated INTEGER
+      );
+      CREATE TABLE IF NOT EXISTS project (
+        id TEXT PRIMARY KEY,
+        name TEXT
+      );
+      INSERT INTO session (id, project_id, title, time_updated) VALUES
+        ('sess-a', 'proj-1', 'Session A', 5000),
+        ('sess-b', 'proj-1', 'Session B', 5000),
+        ('sess-c', 'proj-1', 'Session C', 5000);
+      INSERT INTO project (id, name) VALUES ('proj-1', 'Project One');
+    `);
+    sourceDb2.close();
+
+    const tempDashboardDbPath2 = `/tmp/test-dashboard-dup-${Date.now()}.db`;
+    const sourceDb = openSourceDb(tempSourceDbPath2);
+    const dashboardDb = openDashboardDb(tempDashboardDbPath2);
+
+    // First ingest: all 3 sessions with same time_updated
+    ingestOnce(sourceDb, dashboardDb);
+
+    let sessionCount = dashboardDb
+      .query("SELECT COUNT(*) as count FROM sessions")
+      .get() as { count: number };
+    expect(sessionCount.count).toBe(3);
+
+    // Manually insert time_ingested value for first batch to detect re-ingestion
+    const firstIngestionTime = dashboardDb
+      .query("SELECT MAX(time_ingested) as max_time FROM sessions")
+      .get() as { max_time: number } | null;
+    expect(firstIngestionTime?.max_time).not.toBeNull();
+
+    // Second ingest: should not fetch and update any sessions
+    // If cursor logic is wrong (using >= instead of >), sessions with time_updated=5000
+    // will be fetched again and time_ingested will be updated
+    ingestOnce(sourceDb, dashboardDb);
+
+    const secondIngestionTime = dashboardDb
+      .query("SELECT MAX(time_ingested) as max_time FROM sessions")
+      .get() as { max_time: number } | null;
+
+    sessionCount = dashboardDb
+      .query("SELECT COUNT(*) as count FROM sessions")
+      .get() as { count: number };
+    expect(sessionCount.count).toBe(3);
+
+    // Verify cursor is at 5000
+    const cursor = dashboardDb
+      .query(
+        "SELECT last_time_updated FROM ingestion_cursor WHERE source = 'opencode_session'",
+      )
+      .get() as { last_time_updated: number } | null;
+    expect(cursor?.last_time_updated).toBe(5000);
+
+    // The key assertion: time_ingested should NOT change between runs
+    // (no sessions should be re-fetched and re-ingested)
+    expect(secondIngestionTime?.max_time).toBe(firstIngestionTime?.max_time);
+
+    sourceDb.close();
+    dashboardDb.close();
+
+    // Cleanup
+    if (fs.existsSync(tempSourceDbPath2)) {
+      fs.unlinkSync(tempSourceDbPath2);
+    }
+    if (fs.existsSync(tempDashboardDbPath2)) {
+      fs.unlinkSync(tempDashboardDbPath2);
+    }
+  });
 });
