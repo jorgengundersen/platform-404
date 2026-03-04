@@ -4,6 +4,8 @@ import { formatEnvVarError, requiredNonEmptyString } from "@/primitives/config";
 
 export type Config = {
   readonly opencodeDbPath: string;
+  readonly dashboardDbPath: string;
+  readonly syncIntervalMs: number;
 };
 
 /**
@@ -19,7 +21,23 @@ export function getConfig(
     throw new Error(formatEnvVarError(opencodeDbPath.left));
   }
 
+  const dashboardDbPath = env.DASHBOARD_DB_PATH?.trim() || "/data/dashboard.db";
+
+  let syncIntervalMs = 30000;
+  const rawInterval = env.SYNC_INTERVAL_MS;
+  if (rawInterval !== undefined) {
+    const parsed = Number(rawInterval);
+    if (!Number.isInteger(parsed) || parsed <= 0) {
+      throw new Error(
+        `Invalid env var: SYNC_INTERVAL_MS must be a positive integer, got: ${rawInterval}`,
+      );
+    }
+    syncIntervalMs = parsed;
+  }
+
   return {
     opencodeDbPath: opencodeDbPath.right,
+    dashboardDbPath,
+    syncIntervalMs,
   };
 }
