@@ -1,5 +1,5 @@
 import { Context, Data, Effect, Layer } from "effect";
-
+import type { SessionSummary } from "@/primitives/schemas/session-summary";
 import { DashboardDb } from "@/services/dashboard-db";
 
 // ---------------------------------------------------------------------------
@@ -79,6 +79,12 @@ export class StatsService extends Context.Tag("StatsService")<
       ProjectStat[],
       StatsError
     >;
+    readonly getSessionsForDate: (
+      date: string,
+    ) => Effect.Effect<SessionSummary[], StatsError>;
+    readonly getSessions: (params: {
+      projectId?: string;
+    }) => Effect.Effect<SessionSummary[], StatsError>;
   }
 >() {}
 
@@ -125,6 +131,22 @@ interface ProjectStatRow {
   total_cost: number | null;
   total_tokens_input: number | null;
   total_tokens_output: number | null;
+}
+
+interface SessionRow {
+  id: string;
+  project_id: string;
+  project_name: string | null;
+  title: string | null;
+  message_count: number | null;
+  total_cost: number | null;
+  total_tokens_input: number | null;
+  total_tokens_output: number | null;
+  total_tokens_reasoning: number | null;
+  total_cache_read: number | null;
+  total_cache_write: number | null;
+  time_created: number | null;
+  time_updated: number | null;
 }
 
 // ---------------------------------------------------------------------------
@@ -284,11 +306,105 @@ export const StatsServiceLive: Layer.Layer<StatsService, never, DashboardDb> =
             }),
         });
 
+      const getSessionsForDate = (
+        date: string,
+      ): Effect.Effect<SessionSummary[], StatsError> =>
+        Effect.try({
+          try: () => {
+            const rows = sqlite
+              .query<SessionRow, [string]>(
+                `SELECT id, project_id, project_name, title, message_count,
+                  total_cost, total_tokens_input, total_tokens_output,
+                  total_tokens_reasoning, total_cache_read, total_cache_write,
+                  time_created, time_updated
+                FROM sessions
+                WHERE date(time_created / 1000, 'unixepoch') = ?
+                ORDER BY time_created ASC`,
+              )
+              .all(date);
+
+            return rows.map(
+              (r): SessionSummary => ({
+                id: r.id,
+                projectId: r.project_id,
+                projectName: r.project_name ?? "",
+                title: r.title ?? "",
+                messageCount: r.message_count ?? 0,
+                totalCost: r.total_cost ?? 0,
+                totalTokensInput: r.total_tokens_input ?? 0,
+                totalTokensOutput: r.total_tokens_output ?? 0,
+                totalTokensReasoning: r.total_tokens_reasoning ?? 0,
+                totalCacheRead: r.total_cache_read ?? 0,
+                totalCacheWrite: r.total_cache_write ?? 0,
+                timeCreated: r.time_created ?? 0,
+                timeUpdated: r.time_updated ?? 0,
+              }),
+            );
+          },
+          catch: (cause) =>
+            new StatsError({
+              reason: "Failed to get sessions for date",
+              cause,
+            }),
+        });
+
+      const getSessions = (params: {
+        projectId?: string;
+      }): Effect.Effect<SessionSummary[], StatsError> =>
+        Effect.try({
+          try: () => {
+            const rows = params.projectId
+              ? sqlite
+                  .query<SessionRow, [string]>(
+                    `SELECT id, project_id, project_name, title, message_count,
+                      total_cost, total_tokens_input, total_tokens_output,
+                      total_tokens_reasoning, total_cache_read, total_cache_write,
+                      time_created, time_updated
+                    FROM sessions
+                    WHERE project_id = ?
+                    ORDER BY time_updated DESC`,
+                  )
+                  .all(params.projectId)
+              : sqlite
+                  .query<SessionRow, []>(
+                    `SELECT id, project_id, project_name, title, message_count,
+                      total_cost, total_tokens_input, total_tokens_output,
+                      total_tokens_reasoning, total_cache_read, total_cache_write,
+                      time_created, time_updated
+                    FROM sessions
+                    ORDER BY time_updated DESC`,
+                  )
+                  .all();
+
+            return rows.map(
+              (r): SessionSummary => ({
+                id: r.id,
+                projectId: r.project_id,
+                projectName: r.project_name ?? "",
+                title: r.title ?? "",
+                messageCount: r.message_count ?? 0,
+                totalCost: r.total_cost ?? 0,
+                totalTokensInput: r.total_tokens_input ?? 0,
+                totalTokensOutput: r.total_tokens_output ?? 0,
+                totalTokensReasoning: r.total_tokens_reasoning ?? 0,
+                totalCacheRead: r.total_cache_read ?? 0,
+                totalCacheWrite: r.total_cache_write ?? 0,
+                timeCreated: r.time_created ?? 0,
+                timeUpdated: r.time_updated ?? 0,
+              }),
+            );
+          },
+          catch: (cause) =>
+            new StatsError({ reason: "Failed to get sessions", cause }),
+        });
+
       return {
         getOverview,
         getDailyStats,
         getModelBreakdown,
         getProjectBreakdown,
+        getSessionsForDate,
+        getSessions,
       };
     }),
   );

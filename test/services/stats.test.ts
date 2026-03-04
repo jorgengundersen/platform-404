@@ -1,7 +1,7 @@
 import type { Database } from "bun:sqlite";
 import { describe, expect, test } from "bun:test";
 import { Effect } from "effect";
-
+import type { SessionSummary } from "@/primitives/schemas/session-summary";
 import { DashboardDb, DashboardDbTest } from "@/services/dashboard-db";
 import { StatsService, StatsServiceLive } from "@/services/stats";
 
@@ -285,5 +285,54 @@ describe("StatsService.getProjectBreakdown", () => {
     expect(p2?.projectName).toBe("ProjectB");
     expect(p2?.sessionCount).toBe(1);
     expect(p2?.totalCost).toBeCloseTo(0.1, 5);
+  });
+});
+
+describe("StatsService.getSessionsForDate", () => {
+  test("returns sessions for a given date", async () => {
+    const program = Effect.gen(function* () {
+      const { sqlite } = yield* DashboardDb;
+      seedSessions(sqlite);
+      const stats = yield* StatsService;
+      return yield* stats.getSessionsForDate("2023-11-14");
+    });
+
+    const result = await Effect.runPromise(
+      program.pipe(
+        Effect.provide(StatsServiceLive),
+        Effect.provide(DashboardDbTest),
+      ),
+    );
+
+    expect(result).toHaveLength(1);
+    const session = result[0] as SessionSummary;
+    expect(session.id).toBe("s1");
+    expect(session.projectId).toBe("p1");
+    expect(session.projectName).toBe("ProjectA");
+    expect(session.totalCost).toBeCloseTo(0.05, 5);
+    expect(session.timeCreated).toBe(1700000000000);
+  });
+});
+
+describe("StatsService.getSessions", () => {
+  test("filters sessions by projectId when provided", async () => {
+    const program = Effect.gen(function* () {
+      const { sqlite } = yield* DashboardDb;
+      seedSessions(sqlite);
+      const stats = yield* StatsService;
+      return yield* stats.getSessions({ projectId: "p1" });
+    });
+
+    const result = await Effect.runPromise(
+      program.pipe(
+        Effect.provide(StatsServiceLive),
+        Effect.provide(DashboardDbTest),
+      ),
+    );
+
+    expect(result).toHaveLength(1);
+    const session = result[0] as SessionSummary;
+    expect(session.id).toBe("s1");
+    expect(session.projectId).toBe("p1");
   });
 });
