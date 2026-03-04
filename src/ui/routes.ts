@@ -5,6 +5,7 @@ import { Effect } from "effect";
 
 import { DashboardDb } from "@/services/dashboard-db";
 import { StatsService } from "@/services/stats";
+import { dailyDetailPage } from "@/ui/templates/daily-detail";
 import { dashboard } from "@/ui/templates/dashboard";
 import { modelsPage } from "@/ui/templates/models";
 import { page } from "@/ui/templates/page";
@@ -230,6 +231,49 @@ export const projectsPageHandler = (
       .pipe(Effect.catchAll(() => Effect.succeed([])));
 
     const html = page("Projects – platform-404", projectsPage(projects));
+
+    return new Response(html, {
+      status: 200,
+      headers: { "Content-Type": "text/html; charset=utf-8" },
+    });
+  });
+
+const DATE_REGEX = /^\d{4}-\d{2}-\d{2}$/;
+
+export const dailyDetailPageHandler = (
+  _req: Request,
+  date: string,
+): Effect.Effect<Response, never, StatsService> =>
+  Effect.gen(function* () {
+    if (!DATE_REGEX.test(date)) {
+      return new Response(
+        `Invalid date format. Expected YYYY-MM-DD, got: ${date}`,
+        {
+          status: 400,
+        },
+      );
+    }
+
+    const stats = yield* StatsService;
+
+    const [dailyStats, sessions] = yield* Effect.all(
+      [
+        stats
+          .getDailyStats({ start: date, end: date })
+          .pipe(Effect.catchAll(() => Effect.succeed([]))),
+        stats
+          .getSessionsForDate(date)
+          .pipe(Effect.catchAll(() => Effect.succeed([]))),
+      ],
+      { concurrency: "unbounded" },
+    );
+
+    const stat = dailyStats.length > 0 ? (dailyStats[0] ?? null) : null;
+
+    const html = page(
+      `${date} – platform-404`,
+      dailyDetailPage({ date, stat, sessions }),
+    );
 
     return new Response(html, {
       status: 200,

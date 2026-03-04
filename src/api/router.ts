@@ -20,6 +20,7 @@ import {
 import type { DashboardDb } from "@/services/dashboard-db";
 import type { StatsService } from "@/services/stats";
 import {
+  dailyDetailPageHandler,
   modelsPageHandler,
   projectsPageHandler,
   rootHandler,
@@ -142,6 +143,20 @@ export function createRouter(): HttpRouter.HttpRouter<
     HttpRouter.get("/static/styles.css", liftAsyncHandler(staticStylesHandler)),
     HttpRouter.get("/models", liftHandler(modelsPageHandler)),
     HttpRouter.get("/projects", liftHandler(projectsPageHandler)),
+    HttpRouter.get(
+      "/daily/:date",
+      Effect.gen(function* () {
+        const serverReq = yield* HttpServerRequest.HttpServerRequest;
+        const { date } = yield* HttpRouter.params;
+        const webReq = resolveWebRequest(serverReq);
+        const response = yield* dailyDetailPageHandler(webReq, date ?? "").pipe(
+          Effect.catchAll(() =>
+            Effect.succeed(internalError("Internal server error")),
+          ),
+        );
+        return HttpServerResponse.raw(response);
+      }),
+    ),
     HttpRouter.get(
       "/sessions/:id",
       Effect.gen(function* () {
