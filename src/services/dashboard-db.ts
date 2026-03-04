@@ -1,36 +1,31 @@
 import { Database } from "bun:sqlite";
+import { Context, Data, Effect, Layer } from "effect";
 
-const DEFAULT_DASHBOARD_DB_PATH = "/data/dashboard.db";
-const DASHBOARD_DB_PATH_ENV = "DASHBOARD_DB_PATH";
+// ---------------------------------------------------------------------------
+// Error type
+// ---------------------------------------------------------------------------
 
-/**
- * openDashboardDb - Opens the dashboard database and runs migrations
- *
- * @param dbPath - Path to the dashboard SQLite database (defaults to /data/dashboard.db)
- * @returns Database instance
- */
-export function openDashboardDb(dbPath?: string): Database {
-  const fromEnv = process.env[DASHBOARD_DB_PATH_ENV];
-  const envPath = fromEnv?.trim();
-  const path =
-    dbPath ??
-    (envPath && envPath.length > 0 ? envPath : undefined) ??
-    DEFAULT_DASHBOARD_DB_PATH;
-  const db = new Database(path);
+export class DashboardDbError extends Data.TaggedError("DashboardDbError")<{
+  readonly reason: string;
+  readonly cause?: unknown;
+}> {}
 
-  ensureMigrations(db);
+// ---------------------------------------------------------------------------
+// Service interface
+// ---------------------------------------------------------------------------
 
-  return db;
-}
+export class DashboardDb extends Context.Tag("DashboardDb")<
+  DashboardDb,
+  {
+    readonly sqlite: Database;
+  }
+>() {}
 
-/**
- * ensureMigrations - Creates required tables if they don't exist and runs v2 migration
- * Schema matches architecture.md specifications
- *
- * @param db - Database instance
- */
+// ---------------------------------------------------------------------------
+// Migrations
+// ---------------------------------------------------------------------------
+
 function ensureMigrations(db: Database): void {
-  // Create base tables
   db.exec(`
     CREATE TABLE IF NOT EXISTS ingestion_cursor (
       source TEXT PRIMARY KEY,
@@ -58,14 +53,42 @@ function ensureMigrations(db: Database): void {
       time_updated INTEGER,
       time_ingested INTEGER
     );
+
+    CREATE TABLE IF NOT EXISTS messages (
+      id TEXT PRIMARY KEY,
+      session_id TEXT,
+      role TEXT,
+      provider_id TEXT,
+      model_id TEXT,
+      agent TEXT,
+      cost REAL,
+      tokens_input INTEGER,
+      tokens_output INTEGER,
+      tokens_reasoning INTEGER,
+      cache_read INTEGER,
+      cache_write INTEGER,
+      time_created INTEGER,
+      time_ingested INTEGER
+    );
+
+    CREATE TABLE IF NOT EXISTS daily_stats (
+      date TEXT PRIMARY KEY,
+      session_count INTEGER,
+      message_count INTEGER,
+      total_cost REAL,
+      total_tokens_input INTEGER,
+      total_tokens_output INTEGER,
+      total_tokens_reasoning INTEGER,
+      total_cache_read INTEGER,
+      total_cache_write INTEGER,
+      time_updated INTEGER
+    );
   `);
 
-  // Migrate sessions table v1 -> v2
   migrateSessionsTableV2(db);
 }
 
 function migrateSessionsTableV2(db: Database): void {
-  // Check if sessions table exists
   const sessionsExists = db
     .query(
       "SELECT name FROM sqlite_master WHERE type='table' AND name='sessions'",
@@ -76,7 +99,6 @@ function migrateSessionsTableV2(db: Database): void {
     return;
   }
 
-  // Get current columns
   const columns = db.query("PRAGMA table_info(sessions)").all() as Array<{
     name: string;
     type: string;
@@ -86,11 +108,9 @@ function migrateSessionsTableV2(db: Database): void {
   const idColumn = columns.find((c) => c.name === "id");
   const hasProjectName = columnNames.includes("project_name");
 
-  // Check if migration needed: id is INTEGER or project_name missing
   const needsRebuild = idColumn?.type !== "TEXT";
 
   if (needsRebuild) {
-    // Rebuild table: rename old, create new, copy data with id cast to TEXT
     db.exec(`
       ALTER TABLE sessions RENAME TO sessions_old;
 
@@ -116,12 +136,12 @@ function migrateSessionsTableV2(db: Database): void {
       );
 
       INSERT INTO sessions (
-        id, project_id, project_name, title, version, summary_additions, 
-        summary_deletions, summary_files, message_count, total_cost, 
-        total_tokens_input, total_tokens_output, total_tokens_reasoning, 
+        id, project_id, project_name, title, version, summary_additions,
+        summary_deletions, summary_files, message_count, total_cost,
+        total_tokens_input, total_tokens_output, total_tokens_reasoning,
         total_cache_read, total_cache_write, time_created, time_updated, time_ingested
       )
-      SELECT 
+      SELECT
         CAST(id AS TEXT),
         project_id,
         NULL,
@@ -145,9 +165,73 @@ function migrateSessionsTableV2(db: Database): void {
       DROP TABLE sessions_old;
     `);
   } else if (!hasProjectName) {
-    // Only add missing project_name column
-    db.exec(`
-      ALTER TABLE sessions ADD COLUMN project_name TEXT;
-    `);
+    db.exec(`ALTER TABLE sessions ADD COLUMN project_name TEXT;`);
   }
+}
+
+// ---------------------------------------------------------------------------
+// Layers
+// ---------------------------------------------------------------------------
+
+/**
+ * DashboardDbLive - read-write Layer for the given file path.
+ * Runs migrations on startup.
+ */
+export const DashboardDbLive = (
+  dbPath: string,
+): Layer.Layer<DashboardDb, DashboardDbError> =>
+  Layer.effect(
+    DashboardDb,
+    Effect.try({
+      try: () => {
+        const sqlite = new Database(dbPath);
+        ensureMigrations(sqlite);
+        return { sqlite };
+      },
+      catch: (cause) =>
+        new DashboardDbError({
+          reason: "Failed to open dashboard database",
+          cause,
+        }),
+    }),
+  );
+
+/**
+ * DashboardDbTest - in-memory Layer for tests.
+ */
+export const DashboardDbTest: Layer.Layer<DashboardDb, DashboardDbError> =
+  Layer.effect(
+    DashboardDb,
+    Effect.try({
+      try: () => {
+        const sqlite = new Database(":memory:");
+        ensureMigrations(sqlite);
+        return { sqlite };
+      },
+      catch: (cause) =>
+        new DashboardDbError({
+          reason: "Failed to open in-memory database",
+          cause,
+        }),
+    }),
+  );
+
+// ---------------------------------------------------------------------------
+// Legacy export (backward compat during refactor)
+// ---------------------------------------------------------------------------
+
+/**
+ * @deprecated Use DashboardDbLive layer instead.
+ */
+export function openDashboardDb(dbPath?: string): Database {
+  const DEFAULT_DASHBOARD_DB_PATH = "/data/dashboard.db";
+  const fromEnv = process.env.DASHBOARD_DB_PATH;
+  const envPath = fromEnv?.trim();
+  const path =
+    dbPath ??
+    (envPath && envPath.length > 0 ? envPath : undefined) ??
+    DEFAULT_DASHBOARD_DB_PATH;
+  const db = new Database(path);
+  ensureMigrations(db);
+  return db;
 }
