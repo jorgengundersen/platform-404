@@ -27,6 +27,23 @@ try {
       title TEXT,
       time_updated INTEGER
     );
+
+    CREATE TABLE IF NOT EXISTS message (
+      id TEXT PRIMARY KEY,
+      session_id TEXT,
+      data TEXT,
+      time_created INTEGER,
+      time_updated INTEGER
+    );
+
+    CREATE TABLE IF NOT EXISTS part (
+      id TEXT PRIMARY KEY,
+      message_id TEXT,
+      session_id TEXT,
+      data TEXT,
+      time_created INTEGER,
+      time_updated INTEGER
+    );
   `);
 
   const now = Date.now();
