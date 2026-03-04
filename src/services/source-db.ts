@@ -1,66 +1,194 @@
 import { Database } from "bun:sqlite";
+import { Context, Data, Effect, Layer } from "effect";
 
-interface SessionRow {
+// ---------------------------------------------------------------------------
+// Row types
+// ---------------------------------------------------------------------------
+
+export interface SessionRow {
   id: string;
   project_id: string;
   title: string;
   time_updated: number;
 }
 
-interface ProjectRow {
+export interface ProjectRow {
   id: string;
   name: string;
 }
 
+export interface MessageRow {
+  id: string;
+  session_id: string;
+  data: string;
+  time_created: number;
+  time_updated: number;
+}
+
+export interface PartRow {
+  id: string;
+  message_id: string;
+  session_id: string;
+  data: string;
+  time_created: number;
+  time_updated: number;
+}
+
+// ---------------------------------------------------------------------------
+// Error type
+// ---------------------------------------------------------------------------
+
+export class SourceDbError extends Data.TaggedError("SourceDbError")<{
+  readonly reason: string;
+  readonly cause?: unknown;
+}> {}
+
+// ---------------------------------------------------------------------------
+// Service interface
+// ---------------------------------------------------------------------------
+
+export class SourceDb extends Context.Tag("SourceDb")<
+  SourceDb,
+  {
+    readonly listSessionsUpdatedSince: (
+      sinceMs: number,
+    ) => Effect.Effect<SessionRow[], SourceDbError>;
+    readonly listProjectsByIds: (
+      ids: string[],
+    ) => Effect.Effect<ProjectRow[], SourceDbError>;
+    readonly listMessagesForSessions: (
+      sessionIds: string[],
+    ) => Effect.Effect<MessageRow[], SourceDbError>;
+    readonly listPartsForMessages: (
+      messageIds: string[],
+    ) => Effect.Effect<PartRow[], SourceDbError>;
+  }
+>() {}
+
+// ---------------------------------------------------------------------------
+// Layer
+// ---------------------------------------------------------------------------
+
+export const SourceDbLive = (
+  dbPath: string,
+): Layer.Layer<SourceDb, SourceDbError> =>
+  Layer.effect(
+    SourceDb,
+    Effect.try({
+      try: () => {
+        const sqlite = new Database(dbPath, { readonly: true });
+        sqlite.exec("PRAGMA query_only=ON");
+
+        return {
+          listSessionsUpdatedSince: (sinceMs: number) =>
+            Effect.try({
+              try: () =>
+                sqlite
+                  .query(
+                    "SELECT id, project_id, title, time_updated FROM session WHERE time_updated > ? ORDER BY time_updated ASC",
+                  )
+                  .all(sinceMs) as SessionRow[],
+              catch: (cause) =>
+                new SourceDbError({
+                  reason: "listSessionsUpdatedSince failed",
+                  cause,
+                }),
+            }),
+
+          listProjectsByIds: (ids: string[]) =>
+            Effect.try({
+              try: () => {
+                if (ids.length === 0) return [];
+                const placeholders = ids.map(() => "?").join(",");
+                return sqlite
+                  .query(
+                    `SELECT id, name FROM project WHERE id IN (${placeholders})`,
+                  )
+                  .all(...ids) as ProjectRow[];
+              },
+              catch: (cause) =>
+                new SourceDbError({
+                  reason: "listProjectsByIds failed",
+                  cause,
+                }),
+            }),
+
+          listMessagesForSessions: (sessionIds: string[]) =>
+            Effect.try({
+              try: () => {
+                if (sessionIds.length === 0) return [];
+                const placeholders = sessionIds.map(() => "?").join(",");
+                return sqlite
+                  .query(
+                    `SELECT id, session_id, data, time_created, time_updated FROM message WHERE session_id IN (${placeholders}) ORDER BY time_created ASC`,
+                  )
+                  .all(...sessionIds) as MessageRow[];
+              },
+              catch: (cause) =>
+                new SourceDbError({
+                  reason: "listMessagesForSessions failed",
+                  cause,
+                }),
+            }),
+
+          listPartsForMessages: (messageIds: string[]) =>
+            Effect.try({
+              try: () => {
+                if (messageIds.length === 0) return [];
+                const placeholders = messageIds.map(() => "?").join(",");
+                return sqlite
+                  .query(
+                    `SELECT id, message_id, session_id, data, time_created, time_updated FROM part WHERE message_id IN (${placeholders}) ORDER BY time_created ASC`,
+                  )
+                  .all(...messageIds) as PartRow[];
+              },
+              catch: (cause) =>
+                new SourceDbError({
+                  reason: "listPartsForMessages failed",
+                  cause,
+                }),
+            }),
+        };
+      },
+      catch: (cause) =>
+        new SourceDbError({ reason: "Failed to open source database", cause }),
+    }),
+  );
+
+// ---------------------------------------------------------------------------
+// Legacy exports (backward compat)
+// ---------------------------------------------------------------------------
+
 /**
- * openSourceDb - Opens the OpenCode database in read-only mode with PRAGMA query_only=ON
- *
- * @param dbPath - Path to the OpenCode SQLite database
- * @returns Database instance configured for read-only access
+ * @deprecated Use SourceDbLive layer instead.
  */
 export function openSourceDb(dbPath: string): Database {
   const db = new Database(dbPath, { readonly: true });
-
-  // Enable query_only to prevent all write operations
   db.exec("PRAGMA query_only=ON");
-
   return db;
 }
 
 /**
- * listSessionsUpdatedSince - Lists sessions updated after sinceMs
- *
- * @param db - Database instance
- * @param sinceMs - Timestamp in milliseconds; sessions updated after this time are returned
- * @returns Array of sessions ordered by time_updated ascending
+ * @deprecated Use SourceDb service instead.
  */
 export function listSessionsUpdatedSince(
   db: Database,
   sinceMs: number,
 ): SessionRow[] {
-  const query = db.query(
-    "SELECT id, project_id, title, time_updated FROM session WHERE time_updated > ? ORDER BY time_updated ASC",
-  );
-  const rows = query.all(sinceMs) as SessionRow[];
-  return rows;
+  return db
+    .query(
+      "SELECT id, project_id, title, time_updated FROM session WHERE time_updated > ? ORDER BY time_updated ASC",
+    )
+    .all(sinceMs) as SessionRow[];
 }
 
 /**
- * listProjectsByIds - Lists projects by their IDs
- *
- * @param db - Database instance
- * @param ids - Array of project IDs to fetch
- * @returns Array of projects with { id, name }
+ * @deprecated Use SourceDb service instead.
  */
 export function listProjectsByIds(db: Database, ids: string[]): ProjectRow[] {
-  if (ids.length === 0) {
-    return [];
-  }
-
+  if (ids.length === 0) return [];
   const placeholders = ids.map(() => "?").join(",");
-  const query = db.query(
-    `SELECT id, name FROM project WHERE id IN (${placeholders})`,
-  );
-  const rows = query.all(...ids) as ProjectRow[];
-  return rows;
+  return db
+    .query(`SELECT id, name FROM project WHERE id IN (${placeholders})`)
+    .all(...ids) as ProjectRow[];
 }

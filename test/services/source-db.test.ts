@@ -2,10 +2,14 @@ import { Database } from "bun:sqlite";
 import { afterAll, beforeAll, describe, expect, test } from "bun:test";
 import * as fs from "node:fs";
 
+import { Effect } from "effect";
+
 import {
   listProjectsByIds,
   listSessionsUpdatedSince,
   openSourceDb,
+  SourceDb,
+  SourceDbLive,
 } from "@/services/source-db";
 
 describe("openSourceDb", () => {
@@ -158,5 +162,68 @@ describe("listProjectsByIds", () => {
     });
 
     db.close();
+  });
+});
+
+describe("SourceDb Effect service", () => {
+  let tempDbPath: string;
+
+  beforeAll(() => {
+    tempDbPath = `/tmp/test-sourcedb-effect-${Date.now()}.db`;
+    const db = new Database(tempDbPath);
+    db.exec(`
+      CREATE TABLE session (
+        id TEXT PRIMARY KEY,
+        project_id TEXT,
+        title TEXT,
+        time_updated INTEGER
+      );
+      CREATE TABLE project (
+        id TEXT PRIMARY KEY,
+        name TEXT
+      );
+      CREATE TABLE message (
+        id TEXT PRIMARY KEY,
+        session_id TEXT,
+        data TEXT,
+        time_created INTEGER,
+        time_updated INTEGER
+      );
+      CREATE TABLE part (
+        id TEXT PRIMARY KEY,
+        message_id TEXT,
+        session_id TEXT,
+        data TEXT,
+        time_created INTEGER,
+        time_updated INTEGER
+      );
+      INSERT INTO session VALUES ('s1', 'p1', 'Sess1', 1000);
+      INSERT INTO project VALUES ('p1', 'Proj1');
+      INSERT INTO message VALUES ('m1', 's1', '{"role":"user"}', 1000, 1001);
+      INSERT INTO message VALUES ('m2', 's1', '{"role":"assistant"}', 1002, 1003);
+      INSERT INTO part VALUES ('pt1', 'm1', 's1', '{"type":"text"}', 1000, 1001);
+    `);
+    db.close();
+  });
+
+  afterAll(() => {
+    if (fs.existsSync(tempDbPath)) {
+      fs.unlinkSync(tempDbPath);
+    }
+  });
+
+  test("listMessagesForSessions returns MessageRows for given session ids", async () => {
+    const program = Effect.gen(function* () {
+      const db = yield* SourceDb;
+      return yield* db.listMessagesForSessions(["s1"]);
+    });
+
+    const rows = await Effect.runPromise(
+      program.pipe(Effect.provide(SourceDbLive(tempDbPath))),
+    );
+
+    expect(rows).toHaveLength(2);
+    expect(rows[0]).toMatchObject({ id: "m1", session_id: "s1" });
+    expect(rows[1]).toMatchObject({ id: "m2", session_id: "s1" });
   });
 });
