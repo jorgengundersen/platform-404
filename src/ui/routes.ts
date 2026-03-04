@@ -42,11 +42,6 @@ interface MessageRow {
   time_created: number | null;
 }
 
-function todayMinus(days: number): string {
-  const d = new Date(Date.now() - days * 86_400_000);
-  return d.toISOString().slice(0, 10);
-}
-
 export const rootHandler = (
   _req: Request,
 ): Effect.Effect<Response, never, StatsService | DashboardDb> =>
@@ -54,13 +49,18 @@ export const rootHandler = (
     const stats = yield* StatsService;
     const { sqlite } = yield* DashboardDb;
 
-    const overview = yield* stats
-      .getOverview()
-      .pipe(Effect.catchAll(() => Effect.succeed(null)));
-
-    const daily = yield* stats
-      .getDailyStats({ start: todayMinus(30), end: todayMinus(0) })
-      .pipe(Effect.catchAll(() => Effect.succeed([])));
+    const [overview, projects, models] = yield* Effect.all(
+      [
+        stats.getOverview().pipe(Effect.catchAll(() => Effect.succeed(null))),
+        stats
+          .getProjectBreakdown()
+          .pipe(Effect.catchAll(() => Effect.succeed([]))),
+        stats
+          .getModelBreakdown()
+          .pipe(Effect.catchAll(() => Effect.succeed([]))),
+      ],
+      { concurrency: "unbounded" },
+    );
 
     const rows = sqlite
       .query<SessionRow, [number]>(
@@ -72,7 +72,7 @@ export const rootHandler = (
         ORDER BY time_updated DESC
         LIMIT ?`,
       )
-      .all(50);
+      .all(5);
 
     const sessions = rows.map((r) => ({
       id: r.id,
@@ -105,7 +105,7 @@ export const rootHandler = (
 
     const html = page(
       "platform-404",
-      dashboard(overview ?? emptyOverview, daily, sessions),
+      dashboard(overview ?? emptyOverview, sessions, projects, models),
     );
 
     return new Response(html, {
