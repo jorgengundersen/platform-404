@@ -1,10 +1,16 @@
-import { Effect } from "effect";
+import { Effect, Layer } from "effect";
 
 import { healthHandler } from "@/api/health";
-import { statsOverviewHandler } from "@/api/stats";
+import {
+  statsDailyHandler,
+  statsModelsHandler,
+  statsOverviewHandler,
+  statsProjectsHandler,
+} from "@/api/stats";
 import { getConfig } from "@/config";
 import { getPort } from "@/primitives/port";
 import { DashboardDbLive } from "@/services/dashboard-db";
+import { StatsServiceLive } from "@/services/stats";
 import { rootHandler, staticStylesHandler } from "@/ui/routes";
 
 /**
@@ -19,6 +25,7 @@ export async function boot(): Promise<void> {
   const port = getPort();
 
   const dashboardDbLayer = DashboardDbLive(config.dashboardDbPath);
+  const statsLayer = Layer.provide(StatsServiceLive, dashboardDbLayer);
 
   const server = Bun.serve({
     port,
@@ -33,7 +40,25 @@ export async function boot(): Promise<void> {
 
       if (url.pathname === "/api/stats/overview") {
         return Effect.runPromise(
-          statsOverviewHandler(req).pipe(Effect.provide(dashboardDbLayer)),
+          statsOverviewHandler(req).pipe(Effect.provide(statsLayer)),
+        );
+      }
+
+      if (url.pathname === "/api/stats/daily") {
+        return Effect.runPromise(
+          statsDailyHandler(req).pipe(Effect.provide(statsLayer)),
+        );
+      }
+
+      if (url.pathname === "/api/stats/models") {
+        return Effect.runPromise(
+          statsModelsHandler(req).pipe(Effect.provide(statsLayer)),
+        );
+      }
+
+      if (url.pathname === "/api/stats/projects") {
+        return Effect.runPromise(
+          statsProjectsHandler(req).pipe(Effect.provide(statsLayer)),
         );
       }
 
