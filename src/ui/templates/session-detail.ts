@@ -62,7 +62,7 @@ export function sessionDetail(
       : messages.map(messageRow).join("\n");
 
   return `<main class="session-detail">
-  <header class="site-header">
+  <header class="session-header">
     <a href="/" class="back-link">← Dashboard</a>
     <h1>${escapeHtml(session.title || session.id)}</h1>
   </header>

@@ -49,7 +49,7 @@ a:hover {
   padding: var(--gap);
 }
 
-.site-header {
+.session-header {
   display: flex;
   align-items: center;
   gap: var(--gap);
@@ -58,7 +58,7 @@ a:hover {
   margin-bottom: calc(var(--gap) * 2);
 }
 
-.site-header h1 {
+.session-header h1 {
   margin: 0;
   font-size: 1.5rem;
   color: var(--color-accent);
@@ -79,14 +79,14 @@ a:hover {
   margin-bottom: calc(var(--gap) * 2);
 }
 
-.card {
+.stat-card {
   background: var(--color-surface);
   border: 1px solid var(--color-border);
   border-radius: var(--radius);
   padding: var(--gap);
 }
 
-.card__label {
+.stat-card__label {
   margin: 0 0 0.25rem;
   font-size: 0.75rem;
   font-weight: 500;
@@ -95,7 +95,7 @@ a:hover {
   color: var(--color-muted);
 }
 
-.card__value {
+.stat-card__value {
   margin: 0;
   font-size: 1.75rem;
   font-weight: 700;
@@ -104,14 +104,14 @@ a:hover {
 
 /* Tables */
 
-.daily-breakdown,
-.sessions-list,
+.daily-list,
+.sessions-table,
 .messages-list {
   margin-bottom: calc(var(--gap) * 2);
 }
 
-.daily-breakdown h2,
-.sessions-list h2,
+.daily-list h2,
+.sessions-table h2,
 .messages-list h2 {
   margin: 0 0 var(--gap);
   font-size: 1rem;

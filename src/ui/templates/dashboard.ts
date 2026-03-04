@@ -12,36 +12,36 @@ function formatDate(ms: number): string {
 
 function overviewCards(stats: Overview): string {
   return `<section class="overview-cards">
-  <div class="card">
-    <h2 class="card__label">Sessions</h2>
-    <p class="card__value">${stats.totalSessions}</p>
+  <div class="stat-card">
+    <h2 class="stat-card__label">Sessions</h2>
+    <p class="stat-card__value">${stats.totalSessions}</p>
   </div>
-  <div class="card">
-    <h2 class="card__label">Messages</h2>
-    <p class="card__value">${stats.totalMessages}</p>
+  <div class="stat-card">
+    <h2 class="stat-card__label">Messages</h2>
+    <p class="stat-card__value">${stats.totalMessages}</p>
   </div>
-  <div class="card">
-    <h2 class="card__label">Total Cost</h2>
-    <p class="card__value">${formatCost(stats.totalCost)}</p>
+  <div class="stat-card">
+    <h2 class="stat-card__label">Total Cost</h2>
+    <p class="stat-card__value">${formatCost(stats.totalCost)}</p>
   </div>
-  <div class="card">
-    <h2 class="card__label">Avg Cost / Session</h2>
-    <p class="card__value">${formatCost(stats.avgCostPerSession)}</p>
+  <div class="stat-card">
+    <h2 class="stat-card__label">Avg Cost / Session</h2>
+    <p class="stat-card__value">${formatCost(stats.avgCostPerSession)}</p>
   </div>
-  <div class="card">
-    <h2 class="card__label">Input Tokens</h2>
-    <p class="card__value">${stats.totalTokensInput.toLocaleString()}</p>
+  <div class="stat-card">
+    <h2 class="stat-card__label">Input Tokens</h2>
+    <p class="stat-card__value">${stats.totalTokensInput.toLocaleString()}</p>
   </div>
-  <div class="card">
-    <h2 class="card__label">Output Tokens</h2>
-    <p class="card__value">${stats.totalTokensOutput.toLocaleString()}</p>
+  <div class="stat-card">
+    <h2 class="stat-card__label">Output Tokens</h2>
+    <p class="stat-card__value">${stats.totalTokensOutput.toLocaleString()}</p>
   </div>
 </section>`;
 }
 
 function dailyList(daily: readonly DailyStat[]): string {
   if (daily.length === 0) {
-    return `<section class="daily-breakdown"><p class="empty">No data yet.</p></section>`;
+    return `<section class="daily-list"><p class="empty">No data yet.</p></section>`;
   }
   const rows = [...daily]
     .reverse()
@@ -57,7 +57,7 @@ function dailyList(daily: readonly DailyStat[]): string {
     </tr>`,
     )
     .join("\n");
-  return `<section class="daily-breakdown">
+  return `<section class="daily-list">
   <h2>Daily Breakdown</h2>
   <table class="table">
     <thead>
@@ -72,7 +72,7 @@ function dailyList(daily: readonly DailyStat[]): string {
 
 function sessionsTable(sessions: readonly SessionSummary[]): string {
   if (sessions.length === 0) {
-    return `<section class="sessions-list"><p class="empty">No sessions yet.</p></section>`;
+    return `<section class="sessions-table"><p class="empty">No sessions yet.</p></section>`;
   }
   const rows = sessions
     .map(
@@ -86,7 +86,7 @@ function sessionsTable(sessions: readonly SessionSummary[]): string {
     </tr>`,
     )
     .join("\n");
-  return `<section class="sessions-list">
+  return `<section class="sessions-table">
   <h2>Sessions</h2>
   <table class="table">
     <thead>
@@ -105,7 +105,7 @@ export function dashboard(
   sessions: readonly SessionSummary[],
 ): string {
   return `<main class="dashboard">
-  <header class="site-header">
+  <header class="session-header">
     <h1>platform-404</h1>
   </header>
   ${overviewCards(stats)}

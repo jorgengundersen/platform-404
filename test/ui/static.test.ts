@@ -24,4 +24,17 @@ describe("GET /static/styles.css", () => {
     const body = await response.text();
     expect(body).toContain("--color-bg: #0a0a0a");
   });
+
+  test("contains spec semantic class names", async () => {
+    const req = new Request("http://localhost:3000/static/styles.css", {
+      method: "GET",
+    });
+    const response = await staticStylesHandler(req);
+    const body = await response.text();
+    expect(body).toContain(".stat-card");
+    expect(body).toContain(".sessions-table");
+    expect(body).toContain(".daily-list");
+    expect(body).toContain(".session-header");
+    expect(body).toContain(".messages-list");
+  });
 });
