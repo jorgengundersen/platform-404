@@ -188,6 +188,68 @@ a:hover {
   color: var(--color-muted);
 }
 
+/* Linked stat cards */
+
+a.stat-card {
+  cursor: pointer;
+  text-decoration: none;
+  color: inherit;
+  transition: border-color 0.15s ease;
+  display: block;
+}
+
+a.stat-card:hover {
+  border-color: var(--color-accent);
+}
+
+/* Quick-glance sections */
+
+.quick-section {
+  margin-bottom: calc(var(--gap) * 2);
+}
+
+.quick-section__header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  margin-bottom: var(--gap);
+}
+
+.quick-section__header h2 {
+  margin: 0;
+  font-size: 1rem;
+  color: var(--color-muted);
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+}
+
+/* Pagination */
+
+.pagination {
+  display: flex;
+  justify-content: center;
+  gap: var(--gap);
+  margin-bottom: calc(var(--gap) * 2);
+}
+
+.pagination a {
+  border: 1px solid var(--color-border);
+  padding: 0.25rem 0.75rem;
+  border-radius: var(--radius);
+  color: var(--color-text);
+  text-decoration: none;
+}
+
+.pagination a:hover {
+  border-color: var(--color-accent);
+  text-decoration: none;
+}
+
+.pagination .current {
+  color: var(--color-accent);
+  border-color: var(--color-accent);
+}
+
 /* Mobile */
 
 @media (max-width: 640px) {
