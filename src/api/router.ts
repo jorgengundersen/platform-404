@@ -25,6 +25,7 @@ import {
   projectsPageHandler,
   rootHandler,
   sessionPageHandler,
+  sessionsListPageHandler,
   staticStylesHandler,
 } from "@/ui/routes";
 
@@ -143,6 +144,7 @@ export function createRouter(): HttpRouter.HttpRouter<
     HttpRouter.get("/static/styles.css", liftAsyncHandler(staticStylesHandler)),
     HttpRouter.get("/models", liftHandler(modelsPageHandler)),
     HttpRouter.get("/projects", liftHandler(projectsPageHandler)),
+    HttpRouter.get("/sessions", liftHandler(sessionsListPageHandler)),
     HttpRouter.get(
       "/daily/:date",
       Effect.gen(function* () {

@@ -11,6 +11,7 @@ import { modelsPage } from "@/ui/templates/models";
 import { page } from "@/ui/templates/page";
 import { projectsPage } from "@/ui/templates/projects";
 import { sessionDetail } from "@/ui/templates/session-detail";
+import { sessionsPage } from "@/ui/templates/sessions-list";
 
 interface SessionRow {
   id: string;
@@ -231,6 +232,49 @@ export const projectsPageHandler = (
       .pipe(Effect.catchAll(() => Effect.succeed([])));
 
     const html = page("Projects – platform-404", projectsPage(projects));
+
+    return new Response(html, {
+      status: 200,
+      headers: { "Content-Type": "text/html; charset=utf-8" },
+    });
+  });
+
+export const sessionsListPageHandler = (
+  req: Request,
+): Effect.Effect<Response, never, StatsService> =>
+  Effect.gen(function* () {
+    const url = new URL(req.url);
+    const pageNum = Math.max(
+      1,
+      parseInt(url.searchParams.get("page") ?? "1", 10) || 1,
+    );
+    const limitRaw = parseInt(url.searchParams.get("limit") ?? "50", 10);
+    const limit = Math.min(
+      100,
+      Math.max(1, Number.isNaN(limitRaw) ? 50 : limitRaw),
+    );
+    const projectFilter = url.searchParams.get("project") ?? null;
+
+    const stats = yield* StatsService;
+
+    const sessions = yield* stats
+      .getSessions(projectFilter ? { projectId: projectFilter } : {})
+      .pipe(Effect.catchAll(() => Effect.succeed([])));
+
+    const total = sessions.length;
+    const offset = (pageNum - 1) * limit;
+    const pageSessions = sessions.slice(offset, offset + limit);
+
+    const html = page(
+      "Sessions – platform-404",
+      sessionsPage({
+        sessions: pageSessions,
+        page: pageNum,
+        total,
+        limit,
+        projectFilter,
+      }),
+    );
 
     return new Response(html, {
       status: 200,
