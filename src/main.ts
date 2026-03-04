@@ -1,6 +1,7 @@
 import { Effect, Layer } from "effect";
 
 import { healthHandler } from "@/api/health";
+import { sessionDetailHandler, sessionsListHandler } from "@/api/sessions";
 import {
   statsDailyHandler,
   statsModelsHandler,
@@ -59,6 +60,22 @@ export async function boot(): Promise<void> {
       if (url.pathname === "/api/stats/projects") {
         return Effect.runPromise(
           statsProjectsHandler(req).pipe(Effect.provide(statsLayer)),
+        );
+      }
+
+      if (url.pathname === "/api/sessions") {
+        return Effect.runPromise(
+          sessionsListHandler(req).pipe(Effect.provide(dashboardDbLayer)),
+        );
+      }
+
+      const sessionDetailMatch = url.pathname.match(
+        /^\/api\/sessions\/([^/]+)$/,
+      );
+      if (sessionDetailMatch) {
+        const id = sessionDetailMatch[1] as string;
+        return Effect.runPromise(
+          sessionDetailHandler(req, id).pipe(Effect.provide(dashboardDbLayer)),
         );
       }
 
