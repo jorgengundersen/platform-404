@@ -36,3 +36,8 @@ export function avgTokensPerMessage(
     cache: { read: total.cache.read / count, write: total.cache.write / count },
   };
 }
+
+/** Sum an array of cost values (dollar amounts). */
+export function sumCost(costs: readonly number[]): number {
+  return costs.reduce((acc, c) => acc + c, 0);
+}

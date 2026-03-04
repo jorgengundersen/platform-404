@@ -1,6 +1,10 @@
 import { describe, expect, it } from "bun:test";
 import type { TokenRecord } from "../../src/primitives/schemas/token-record";
-import { avgTokensPerMessage, sumTokens } from "../../src/primitives/tokens";
+import {
+  avgTokensPerMessage,
+  sumCost,
+  sumTokens,
+} from "../../src/primitives/tokens";
 
 const r = (
   i: number,
@@ -79,5 +83,19 @@ describe("avgTokensPerMessage", () => {
       reasoning: 0,
       cache: { read: 0, write: 0 },
     });
+  });
+});
+
+describe("sumCost", () => {
+  it("sums costs from multiple values", () => {
+    expect(sumCost([0.01, 0.02, 0.003])).toBeCloseTo(0.033);
+  });
+
+  it("returns 0 for empty array", () => {
+    expect(sumCost([])).toBe(0);
+  });
+
+  it("single value is identity", () => {
+    expect(sumCost([0.05])).toBeCloseTo(0.05);
   });
 });
