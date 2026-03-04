@@ -5,7 +5,7 @@ services:
       - "3000:3000"
     environment:
       PORT: "3000"
-      OPENCODE_DB_PATH: /opencode/opencode.db
+      OPENCODE_DB_PATH: /opencode/opencode/opencode.db
       DASHBOARD_DB_PATH: /data/dashboard.db
       SYNC_INTERVAL_MS: "30000"
     volumes:

@@ -41,4 +41,12 @@ describe("docker-compose.yml", () => {
     expect(content).toContain("PORT");
     expect(content).toContain("SYNC_INTERVAL_MS");
   });
+
+  test("OPENCODE_DB_PATH points to correct nested path in devenv-data volume", () => {
+    const content = readFileSync(join(root, "docker-compose.yml"), "utf-8");
+    // devenv-data mounts at /opencode; DB lives at opencode/opencode.db inside the volume
+    expect(content).toContain(
+      "OPENCODE_DB_PATH: /opencode/opencode/opencode.db",
+    );
+  });
 });
