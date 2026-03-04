@@ -15,7 +15,11 @@ import {
 } from "@/api/stats";
 import type { DashboardDb } from "@/services/dashboard-db";
 import type { StatsService } from "@/services/stats";
-import { rootHandler, staticStylesHandler } from "@/ui/routes";
+import {
+  rootHandler,
+  sessionPageHandler,
+  staticStylesHandler,
+} from "@/ui/routes";
 
 // ---------------------------------------------------------------------------
 // Helpers
@@ -116,6 +120,20 @@ export function createRouter(): HttpRouter.HttpRouter<
       }),
     ),
     HttpRouter.get("/static/styles.css", liftAsyncHandler(staticStylesHandler)),
-    HttpRouter.get("/", liftAsyncHandler(rootHandler)),
+    HttpRouter.get(
+      "/sessions/:id",
+      Effect.gen(function* () {
+        const serverReq = yield* HttpServerRequest.HttpServerRequest;
+        const { id } = yield* HttpRouter.params;
+        const webReq = resolveWebRequest(serverReq);
+        const response = yield* sessionPageHandler(webReq, id ?? "").pipe(
+          Effect.catchAll(() =>
+            Effect.succeed(internalError("Internal server error")),
+          ),
+        );
+        return HttpServerResponse.raw(response);
+      }),
+    ),
+    HttpRouter.get("/", liftHandler(rootHandler)),
   );
 }
