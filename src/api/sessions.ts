@@ -1,5 +1,7 @@
+import { Schema } from "@effect/schema";
 import { Effect } from "effect";
 
+import { SessionsListQueryParams } from "@/primitives/schemas/api-params";
 import { DashboardDb } from "@/services/dashboard-db";
 
 // ---------------------------------------------------------------------------
@@ -70,23 +72,20 @@ export const sessionsListHandler = (
 ): Effect.Effect<Response, never, DashboardDb> =>
   Effect.gen(function* () {
     const url = new URL(req.url);
-    const pageRaw = url.searchParams.get("page") ?? "1";
-    const limitRaw = url.searchParams.get("limit") ?? "20";
+    const raw = {
+      page: url.searchParams.get("page") ?? undefined,
+      limit: url.searchParams.get("limit") ?? undefined,
+    };
 
-    const page = Number(pageRaw);
-    const limit = Number(limitRaw);
-
-    if (!Number.isInteger(page) || page < 1 || Number.isNaN(page)) {
-      return jsonError("page must be a positive integer");
+    const parseResult = Schema.decodeUnknownEither(SessionsListQueryParams)(
+      raw,
+    );
+    if (parseResult._tag === "Left") {
+      return jsonError(
+        "page must be a positive integer and limit must be between 1 and 100",
+      );
     }
-    if (
-      !Number.isInteger(limit) ||
-      limit < 1 ||
-      limit > 100 ||
-      Number.isNaN(limit)
-    ) {
-      return jsonError("limit must be an integer between 1 and 100");
-    }
+    const { page, limit } = parseResult.right;
 
     const offset = (page - 1) * limit;
     const { sqlite } = yield* DashboardDb;

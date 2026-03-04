@@ -1,12 +1,12 @@
+import { Schema } from "@effect/schema";
 import { Effect } from "effect";
 
+import { DateRangeParams } from "@/primitives/schemas/api-params";
 import { type StatsError, StatsService } from "@/services/stats";
 
 // ---------------------------------------------------------------------------
 // Helpers
 // ---------------------------------------------------------------------------
-
-const DATE_RE = /^\d{4}-\d{2}-\d{2}$/;
 
 function jsonOk(data: unknown): Response {
   return new Response(JSON.stringify({ data }), {
@@ -47,16 +47,18 @@ export const statsDailyHandler = (
 ): Effect.Effect<Response, StatsError, StatsService> =>
   Effect.gen(function* () {
     const url = new URL(req.url);
-    const start = url.searchParams.get("start");
-    const end = url.searchParams.get("end");
+    const raw = {
+      start: url.searchParams.get("start") ?? undefined,
+      end: url.searchParams.get("end") ?? undefined,
+    };
 
-    if (!start || !end) {
-      return jsonError("Missing required query params: start, end");
+    const parseResult = Schema.decodeUnknownEither(DateRangeParams)(raw);
+    if (parseResult._tag === "Left") {
+      return jsonError(
+        "Params start and end must be present and in YYYY-MM-DD format",
+      );
     }
-
-    if (!DATE_RE.test(start) || !DATE_RE.test(end)) {
-      return jsonError("Params start and end must be in YYYY-MM-DD format");
-    }
+    const { start, end } = parseResult.right;
 
     const stats = yield* StatsService;
     const daily = yield* stats.getDailyStats({ start, end });
