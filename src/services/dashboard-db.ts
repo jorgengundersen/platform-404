@@ -215,23 +215,3 @@ export const DashboardDbTest: Layer.Layer<DashboardDb, DashboardDbError> =
         }),
     }),
   );
-
-// ---------------------------------------------------------------------------
-// Legacy export (backward compat during refactor)
-// ---------------------------------------------------------------------------
-
-/**
- * @deprecated Use DashboardDbLive layer instead.
- */
-export function openDashboardDb(dbPath?: string): Database {
-  const DEFAULT_DASHBOARD_DB_PATH = "/data/dashboard.db";
-  const fromEnv = process.env.DASHBOARD_DB_PATH;
-  const envPath = fromEnv?.trim();
-  const path =
-    dbPath ??
-    (envPath && envPath.length > 0 ? envPath : undefined) ??
-    DEFAULT_DASHBOARD_DB_PATH;
-  const db = new Database(path);
-  ensureMigrations(db);
-  return db;
-}

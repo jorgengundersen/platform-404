@@ -1,25 +1,20 @@
-import { openDashboardDb } from "@/services/dashboard-db";
+import { Effect } from "effect";
+
+import { DashboardDb, type DashboardDbError } from "@/services/dashboard-db";
 
 /**
- * statsOverviewHandler - Returns overview stats from dashboard database
- *
- * @param _req - HTTP request
- * @param dbPath - Optional path to dashboard database (defaults to standard path)
- * @returns JSON response with totalSessions count
+ * statsOverviewHandler - Returns overview stats from dashboard database.
+ * Requires DashboardDb in context.
  */
-export async function statsOverviewHandler(
+export const statsOverviewHandler = (
   _req: Request,
-  dbPath?: string,
-): Promise<Response> {
-  const db = openDashboardDb(dbPath);
+): Effect.Effect<Response, DashboardDbError, DashboardDb> =>
+  Effect.gen(function* () {
+    const { sqlite } = yield* DashboardDb;
 
-  try {
-    // Query total session count (using DISTINCT to handle malformed schemas with duplicate ids)
-    const result = db
+    const result = sqlite
       .query("SELECT COUNT(DISTINCT id) as total FROM sessions")
-      .get() as {
-      total: number;
-    } | null;
+      .get() as { total: number } | null;
 
     const totalSessions = result?.total ?? 0;
 
@@ -36,7 +31,4 @@ export async function statsOverviewHandler(
         },
       },
     );
-  } finally {
-    db.close();
-  }
-}
+  });

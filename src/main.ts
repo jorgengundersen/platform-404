@@ -1,7 +1,10 @@
+import { Effect } from "effect";
+
 import { healthHandler } from "@/api/health";
 import { statsOverviewHandler } from "@/api/stats";
 import { getConfig } from "@/config";
 import { getPort } from "@/primitives/port";
+import { DashboardDbLive } from "@/services/dashboard-db";
 import { rootHandler, staticStylesHandler } from "@/ui/routes";
 
 /**
@@ -12,20 +15,26 @@ import { rootHandler, staticStylesHandler } from "@/ui/routes";
  */
 export async function boot(): Promise<void> {
   // Fail fast on missing/invalid required config.
-  void getConfig();
+  const config = getConfig();
   const port = getPort();
+
+  const dashboardDbLayer = DashboardDbLive(config.dashboardDbPath);
 
   const server = Bun.serve({
     port,
-    fetch(req: Request): Response | Promise<Response> {
+    async fetch(req: Request): Promise<Response> {
       const url = new URL(req.url);
 
       if (url.pathname === "/api/health") {
-        return healthHandler(req);
+        return Effect.runPromise(
+          healthHandler(req).pipe(Effect.provide(dashboardDbLayer)),
+        );
       }
 
       if (url.pathname === "/api/stats/overview") {
-        return statsOverviewHandler(req);
+        return Effect.runPromise(
+          statsOverviewHandler(req).pipe(Effect.provide(dashboardDbLayer)),
+        );
       }
 
       if (url.pathname === "/static/styles.css") {

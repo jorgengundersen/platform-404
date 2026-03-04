@@ -1,30 +1,19 @@
-import { afterAll, beforeAll, describe, expect, test } from "bun:test";
-import * as fs from "node:fs";
+import { describe, expect, test } from "bun:test";
+
+import { Effect } from "effect";
 
 import { healthHandler } from "@/api/health";
-import { openDashboardDb } from "@/services/dashboard-db";
+import { DashboardDb, DashboardDbTest } from "@/services/dashboard-db";
 
 describe("GET /api/health", () => {
-  let tempDbPath: string;
-
-  beforeAll(() => {
-    tempDbPath = `/tmp/test-health-${Date.now()}.db`;
-  });
-
-  afterAll(() => {
-    if (fs.existsSync(tempDbPath)) {
-      fs.unlinkSync(tempDbPath);
-    }
-  });
-
-  test("returns 200 with JSON { data: { status: 'ok' } }", async () => {
-    const db = openDashboardDb(tempDbPath);
-    db.close();
-
+  test("returns 200 with JSON { data: { status: 'ok', lastSync: null } } when no cursor", async () => {
     const req = new Request("http://localhost:3000/api/health", {
       method: "GET",
     });
-    const response = await healthHandler(req, tempDbPath);
+
+    const response = await Effect.runPromise(
+      healthHandler(req).pipe(Effect.provide(DashboardDbTest)),
+    );
 
     expect(response.status).toBe(200);
 
@@ -39,30 +28,32 @@ describe("GET /api/health", () => {
     });
   });
 
-  test("includes lastSync: number | null in response", async () => {
-    // Setup: create temp database with sync data
-    const db = openDashboardDb(tempDbPath);
+  test("includes lastSync: number from ingestion_cursor", async () => {
     const now = Date.now();
-    const cursorStmt = db.prepare(
-      "INSERT INTO ingestion_cursor (source, last_time_updated, last_synced_at) VALUES (?, ?, ?)",
-    );
-    cursorStmt.run("opencode_session", now, now);
-    db.close();
 
-    const req = new Request("http://localhost:3000/api/health", {
-      method: "GET",
+    const program = Effect.gen(function* () {
+      const { sqlite } = yield* DashboardDb;
+      sqlite
+        .prepare(
+          "INSERT INTO ingestion_cursor (source, last_time_updated, last_synced_at) VALUES (?, ?, ?)",
+        )
+        .run("opencode_session", now, now);
+
+      const req = new Request("http://localhost:3000/api/health", {
+        method: "GET",
+      });
+      return yield* healthHandler(req);
     });
-    const response = await healthHandler(req, tempDbPath);
+
+    const response = await Effect.runPromise(
+      program.pipe(Effect.provide(DashboardDbTest)),
+    );
 
     expect(response.status).toBe(200);
 
     const body = (await response.json()) as {
       data: { status: string; lastSync: number | null };
     };
-    expect(body.data).toHaveProperty("lastSync");
-    expect(
-      typeof body.data.lastSync === "number" || body.data.lastSync === null,
-    ).toBe(true);
     expect(body.data.lastSync).toBe(now);
   });
 });

@@ -1,21 +1,18 @@
-import { openDashboardDb } from "@/services/dashboard-db";
+import { Effect } from "effect";
+
+import { DashboardDb, type DashboardDbError } from "@/services/dashboard-db";
 
 /**
- * healthHandler - Returns health status with last sync timestamp
- *
- * @param _req - HTTP request
- * @param dbPath - Optional path to dashboard database (defaults to standard path)
- * @returns JSON response with status and lastSync timestamp
+ * healthHandler - Returns health status with last sync timestamp.
+ * Requires DashboardDb in context.
  */
-export async function healthHandler(
+export const healthHandler = (
   _req: Request,
-  dbPath?: string,
-): Promise<Response> {
-  const db = openDashboardDb(dbPath);
+): Effect.Effect<Response, DashboardDbError, DashboardDb> =>
+  Effect.gen(function* () {
+    const { sqlite } = yield* DashboardDb;
 
-  try {
-    // Fetch lastSync from the database
-    const cursor = db
+    const cursor = sqlite
       .query("SELECT last_synced_at FROM ingestion_cursor WHERE source = ?")
       .get("opencode_session") as { last_synced_at: number } | null;
 
@@ -35,7 +32,4 @@ export async function healthHandler(
         },
       },
     );
-  } finally {
-    db.close();
-  }
-}
+  });
