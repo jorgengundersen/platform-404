@@ -1,7 +1,7 @@
 ---
 description: Primary orchestrator for the ralph iteration; delegates work to subagents.
 mode: primary
-model: github-copilot/gpt-5.2-codex
+model: github-copilot/claude-sonnet-4.6
 temperature: 0.2
 tools:
   bash: false

@@ -13,7 +13,6 @@ set -euo pipefail
 # Defaults (adjust these)
 # ---------------------------------------------------------------------------
 DEFAULT_MODEL="github-copilot/claude-sonnet-4.6"
-DEFAULT_AGENT="ralph-main"
 DEFAULT_PROMPT=".ralph/PROMPT.md"
 DEFAULT_MAX_ITERATIONS=10
 DEFAULT_DONE_FILE=".ralph/DONE"
@@ -34,7 +33,6 @@ usage: ralph-loop [options]
 
 options:
   -m, --model <model>       model to use (default: $DEFAULT_MODEL)
-  -a, --agent <agent>       agent to use (default: $DEFAULT_AGENT)
   -p, --prompt <file>       prompt file, relative to project root (default: $DEFAULT_PROMPT)
   -n, --max-iterations <n>  max loop iterations (default: $DEFAULT_MAX_ITERATIONS)
   -h, --help                show this help
@@ -46,7 +44,6 @@ EOF
 # Parse args
 # ---------------------------------------------------------------------------
 MODEL="$DEFAULT_MODEL"
-AGENT="$DEFAULT_AGENT"
 PROMPT_REL="$DEFAULT_PROMPT"
 MAX_ITERATIONS="$DEFAULT_MAX_ITERATIONS"
 DONE_FILE="$PROJECT_DIR/$DEFAULT_DONE_FILE"
@@ -55,7 +52,6 @@ LOG_DIR="$PROJECT_DIR/$DEFAULT_LOG_DIR"
 while [[ $# -gt 0 ]]; do
   case "$1" in
     -m|--model)          MODEL="$2"; shift 2 ;;
-    -a|--agent)          AGENT="$2"; shift 2 ;;
     -p|--prompt)         PROMPT_REL="$2"; shift 2 ;;
     -n|--max-iterations) MAX_ITERATIONS="$2"; shift 2 ;;
     -h|--help)           usage ;;
@@ -127,7 +123,7 @@ check_no_ready_work() {
 # ---------------------------------------------------------------------------
 RUN_START=$(date +%s)
 
-log INFO "event=start project=$PROJECT_DIR model=$MODEL agent=$AGENT prompt=$PROMPT_REL max=$MAX_ITERATIONS log=$LOG_FILE"
+log INFO "event=start project=$PROJECT_DIR model=$MODEL prompt=$PROMPT_REL max=$MAX_ITERATIONS log=$LOG_FILE"
 
 SESSIONS_RUN=0
 EXIT_REASON=""
@@ -154,7 +150,7 @@ for ((LOOP_COUNT=1; LOOP_COUNT<=MAX_ITERATIONS; LOOP_COUNT++)); do
   ITER_START=$(date +%s)
   PROMPT=$(cat "$PROMPT_FILE")
   set +e
-  opencode run "$PROMPT" --model "$MODEL" --agent "$AGENT" --dir "$PROJECT_DIR" --thinking "true"
+  opencode run "$PROMPT" --model "$MODEL" --dir "$PROJECT_DIR" --thinking "true"
   SESSION_EXIT=$?
   set -e
   ITER_END=$(date +%s)

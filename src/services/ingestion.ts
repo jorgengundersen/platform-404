@@ -6,6 +6,7 @@ import {
   AssistantMessageData,
   UserMessageData,
 } from "@/primitives/schemas/message-data";
+import { PartData } from "@/primitives/schemas/part-data";
 import { bucketByDay } from "@/primitives/time";
 import { DashboardDb } from "@/services/dashboard-db";
 import { SourceDb } from "@/services/source-db";
@@ -36,6 +37,7 @@ export class IngestionService extends Context.Tag("IngestionService")<
 
 const decodeAssistant = Schema.decodeUnknownOption(AssistantMessageData);
 const decodeUser = Schema.decodeUnknownOption(UserMessageData);
+const decodePart = Schema.decodeUnknownOption(PartData);
 
 // ---------------------------------------------------------------------------
 // Layer
@@ -94,6 +96,18 @@ export const IngestionServiceLive: Layer.Layer<
           (e) =>
             new IngestionError({
               reason: "Failed to list messages",
+              cause: e,
+            }),
+        ),
+      );
+
+      // ---- 3. Parts (step-finish) ----
+      const messageIds = messages.map((m) => m.id);
+      const parts = yield* sourceDb.listPartsForMessages(messageIds).pipe(
+        Effect.mapError(
+          (e) =>
+            new IngestionError({
+              reason: "Failed to list parts",
               cause: e,
             }),
         ),
@@ -243,6 +257,53 @@ export const IngestionServiceLive: Layer.Layer<
           });
         }
 
+        // Build a message_id -> session_id lookup for parts
+        const msgSessionMap = new Map(
+          messages.map((m) => [m.id, m.session_id]),
+        );
+
+        // Compute per-session aggregates from step-finish parts
+        const sessionPartsMap = new Map<
+          string,
+          {
+            cost: number;
+            tokens_input: number;
+            tokens_output: number;
+            tokens_reasoning: number;
+            cache_read: number;
+            cache_write: number;
+          }
+        >();
+
+        for (const part of parts) {
+          const parsed = safeParseJson(part.data);
+          const raw = Option.getOrNull(parsed);
+          const decoded =
+            raw !== null ? Option.getOrNull(decodePart(raw)) : null;
+          if (decoded === null || decoded.type !== "step-finish") continue;
+
+          const sessionId =
+            msgSessionMap.get(part.message_id) ?? part.session_id;
+          const existing = sessionPartsMap.get(sessionId) ?? {
+            cost: 0,
+            tokens_input: 0,
+            tokens_output: 0,
+            tokens_reasoning: 0,
+            cache_read: 0,
+            cache_write: 0,
+          };
+
+          sessionPartsMap.set(sessionId, {
+            cost: existing.cost + decoded.cost,
+            tokens_input: existing.tokens_input + decoded.tokens.input,
+            tokens_output: existing.tokens_output + decoded.tokens.output,
+            tokens_reasoning:
+              existing.tokens_reasoning + decoded.tokens.reasoning,
+            cache_read: existing.cache_read + decoded.tokens.cache.read,
+            cache_write: existing.cache_write + decoded.tokens.cache.write,
+          });
+        }
+
         // Upsert sessions
         const upsertSession = sqlite.prepare(`
           INSERT INTO sessions (
@@ -269,7 +330,7 @@ export const IngestionServiceLive: Layer.Layer<
 
         for (const session of sessions) {
           const projectName = projectNameMap.get(session.project_id) ?? null;
-          const agg = sessionMsgMap.get(session.id) ?? {
+          const msgAgg = sessionMsgMap.get(session.id) ?? {
             cost: 0,
             tokens_input: 0,
             tokens_output: 0,
@@ -278,6 +339,14 @@ export const IngestionServiceLive: Layer.Layer<
             cache_write: 0,
             count: 0,
           };
+          const partsAgg = sessionPartsMap.get(session.id);
+
+          // Prefer step-finish part totals when available (more granular);
+          // fall back to message-level aggregates otherwise.
+          const agg =
+            partsAgg !== undefined
+              ? { ...partsAgg, count: msgAgg.count }
+              : msgAgg;
 
           upsertSession.run(
             session.id,
