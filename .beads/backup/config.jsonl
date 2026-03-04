@@ -7,6 +7,5 @@
 {"key":"compact_tier2_days","value":"90"}
 {"key":"compact_tier2_dep_levels","value":"5"}
 {"key":"compaction_enabled","value":"false"}
-{"key":"issue-prefix","value":"p404"}
-{"key":"issue_prefix","value":"platform-404"}
+{"key":"issue_prefix","value":"p404"}
 {"key":"schema_version","value":"6"}
