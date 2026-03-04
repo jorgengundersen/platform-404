@@ -16,6 +16,11 @@ describe("Dockerfile", () => {
     expect(content).toContain("EXPOSE 3000");
     expect(content).toContain("src/main.ts");
   });
+
+  test("copies tsconfig.json so @/ path aliases resolve at runtime", () => {
+    const content = readFileSync(join(root, "Dockerfile"), "utf-8");
+    expect(content).toContain("tsconfig.json");
+  });
 });
 
 describe("docker-compose.yml", () => {
