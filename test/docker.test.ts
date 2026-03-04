@@ -14,7 +14,13 @@ describe("Dockerfile", () => {
     expect(content).toContain("bun install --frozen-lockfile --production");
     expect(content).toContain("COPY src/");
     expect(content).toContain("EXPOSE 3000");
-    expect(content).toContain("src/main.ts");
+  });
+
+  test("copies index.ts and uses it as CMD entrypoint", () => {
+    const content = readFileSync(join(root, "Dockerfile"), "utf-8");
+    expect(content).toContain("index.ts");
+    // CMD must invoke index.ts, not src/main.ts directly
+    expect(content).toContain('"index.ts"');
   });
 
   test("copies tsconfig.json so @/ path aliases resolve at runtime", () => {
