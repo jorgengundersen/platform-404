@@ -6,6 +6,7 @@ import { Effect } from "effect";
 import { DashboardDb } from "@/services/dashboard-db";
 import { StatsService } from "@/services/stats";
 import { dashboard } from "@/ui/templates/dashboard";
+import { modelsPage } from "@/ui/templates/models";
 import { page } from "@/ui/templates/page";
 import { sessionDetail } from "@/ui/templates/session-detail";
 
@@ -198,3 +199,21 @@ export async function staticStylesHandler(_req: Request): Promise<Response> {
     },
   });
 }
+
+export const modelsPageHandler = (
+  _req: Request,
+): Effect.Effect<Response, never, StatsService> =>
+  Effect.gen(function* () {
+    const stats = yield* StatsService;
+
+    const models = yield* stats
+      .getModelBreakdown()
+      .pipe(Effect.catchAll(() => Effect.succeed([])));
+
+    const html = page("Models – platform-404", modelsPage(models));
+
+    return new Response(html, {
+      status: 200,
+      headers: { "Content-Type": "text/html; charset=utf-8" },
+    });
+  });
