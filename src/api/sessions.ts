@@ -3,6 +3,7 @@ import { Effect } from "effect";
 
 import { SessionsListQueryParams } from "@/primitives/schemas/api-params";
 import { DashboardDb } from "@/services/dashboard-db";
+import { type StatsError, StatsService } from "@/services/stats";
 
 // ---------------------------------------------------------------------------
 // Helpers
@@ -191,4 +192,37 @@ export const sessionDetailHandler = (
     }));
 
     return jsonOk({ session, messages });
+  });
+
+const DATE_REGEX = /^\d{4}-\d{2}-\d{2}$/;
+
+/**
+ * apiDailyDetailHandler - GET /api/daily/:date
+ * Returns sessions and daily summary for a specific date (YYYY-MM-DD).
+ */
+export const apiDailyDetailHandler = (
+  _req: Request,
+  date: string,
+): Effect.Effect<Response, StatsError, StatsService> =>
+  Effect.gen(function* () {
+    if (!DATE_REGEX.test(date)) {
+      return new Response(
+        `Invalid date format. Expected YYYY-MM-DD, got: ${date}`,
+        { status: 400 },
+      );
+    }
+
+    const stats = yield* StatsService;
+
+    const [dailyStats, sessions] = yield* Effect.all(
+      [
+        stats.getDailyStats({ start: date, end: date }),
+        stats.getSessionsForDate(date),
+      ],
+      { concurrency: "unbounded" },
+    );
+
+    const stat = dailyStats.length > 0 ? dailyStats[0] : null;
+
+    return jsonOk({ date, stat, sessions });
   });

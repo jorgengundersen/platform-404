@@ -6,7 +6,11 @@ import {
 import { Effect } from "effect";
 
 import { healthHandler } from "@/api/health";
-import { sessionDetailHandler, sessionsListHandler } from "@/api/sessions";
+import {
+  apiDailyDetailHandler,
+  sessionDetailHandler,
+  sessionsListHandler,
+} from "@/api/sessions";
 import {
   statsDailyHandler,
   statsModelsHandler,
@@ -106,6 +110,20 @@ export function createRouter(): HttpRouter.HttpRouter<
     HttpRouter.get("/api/stats/models", liftHandler(statsModelsHandler)),
     HttpRouter.get("/api/stats/projects", liftHandler(statsProjectsHandler)),
     HttpRouter.get("/api/sessions", liftHandler(sessionsListHandler)),
+    HttpRouter.get(
+      "/api/daily/:date",
+      Effect.gen(function* () {
+        const serverReq = yield* HttpServerRequest.HttpServerRequest;
+        const { date } = yield* HttpRouter.params;
+        const webReq = resolveWebRequest(serverReq);
+        const response = yield* apiDailyDetailHandler(webReq, date ?? "").pipe(
+          Effect.catchAll(() =>
+            Effect.succeed(internalError("Internal server error")),
+          ),
+        );
+        return HttpServerResponse.raw(response);
+      }),
+    ),
     HttpRouter.get(
       "/api/sessions/:id",
       Effect.gen(function* () {
