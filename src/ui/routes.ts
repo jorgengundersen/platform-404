@@ -8,6 +8,7 @@ import { StatsService } from "@/services/stats";
 import { dashboard } from "@/ui/templates/dashboard";
 import { modelsPage } from "@/ui/templates/models";
 import { page } from "@/ui/templates/page";
+import { projectsPage } from "@/ui/templates/projects";
 import { sessionDetail } from "@/ui/templates/session-detail";
 
 interface SessionRow {
@@ -211,6 +212,24 @@ export const modelsPageHandler = (
       .pipe(Effect.catchAll(() => Effect.succeed([])));
 
     const html = page("Models – platform-404", modelsPage(models));
+
+    return new Response(html, {
+      status: 200,
+      headers: { "Content-Type": "text/html; charset=utf-8" },
+    });
+  });
+
+export const projectsPageHandler = (
+  _req: Request,
+): Effect.Effect<Response, never, StatsService> =>
+  Effect.gen(function* () {
+    const stats = yield* StatsService;
+
+    const projects = yield* stats
+      .getProjectBreakdown()
+      .pipe(Effect.catchAll(() => Effect.succeed([])));
+
+    const html = page("Projects – platform-404", projectsPage(projects));
 
     return new Response(html, {
       status: 200,

@@ -21,6 +21,7 @@ import type { DashboardDb } from "@/services/dashboard-db";
 import type { StatsService } from "@/services/stats";
 import {
   modelsPageHandler,
+  projectsPageHandler,
   rootHandler,
   sessionPageHandler,
   staticStylesHandler,
@@ -140,6 +141,7 @@ export function createRouter(): HttpRouter.HttpRouter<
     ),
     HttpRouter.get("/static/styles.css", liftAsyncHandler(staticStylesHandler)),
     HttpRouter.get("/models", liftHandler(modelsPageHandler)),
+    HttpRouter.get("/projects", liftHandler(projectsPageHandler)),
     HttpRouter.get(
       "/sessions/:id",
       Effect.gen(function* () {
