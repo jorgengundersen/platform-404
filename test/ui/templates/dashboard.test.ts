@@ -122,4 +122,10 @@ describe("dashboard()", () => {
     expect(html).toContain("Top Models");
     expect(html).toContain("claude-3-5-sonnet");
   });
+
+  test("renders date cells in Recent Sessions table as links to /daily/:date", () => {
+    const html = dashboard(overview, sessions, projects, models);
+    const date = new Date(2000).toISOString().slice(0, 10); // "1970-01-01"
+    expect(html).toContain(`<a href="/daily/${date}">${date}</a>`);
+  });
 });

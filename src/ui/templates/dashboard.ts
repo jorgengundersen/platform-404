@@ -59,7 +59,7 @@ function recentSessionsSection(sessions: readonly SessionSummary[]): string {
     <td>${escapeHtml(s.projectName)}</td>
     <td><a href="/sessions/${escapeHtml(s.id)}">${escapeHtml(s.title || s.id)}</a></td>
     <td>${formatCost(s.totalCost)}</td>
-    <td>${escapeHtml(formatDate(s.timeUpdated))}</td>
+    <td><a href="/daily/${escapeHtml(formatDate(s.timeUpdated))}">${escapeHtml(formatDate(s.timeUpdated))}</a></td>
   </tr>`,
           )
           .join("\n");
