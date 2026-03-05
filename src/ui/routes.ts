@@ -8,7 +8,7 @@ import { StatsService } from "@/services/stats";
 import { dailyDetailPage } from "@/ui/templates/daily-detail";
 import { dashboard } from "@/ui/templates/dashboard";
 import { modelsPage } from "@/ui/templates/models";
-import { page } from "@/ui/templates/page";
+import { escapeHtml, page } from "@/ui/templates/page";
 import { projectsPage } from "@/ui/templates/projects";
 import { sessionDetail } from "@/ui/templates/session-detail";
 import { sessionsPage } from "@/ui/templates/sessions-list";
@@ -281,6 +281,28 @@ export const sessionsListPageHandler = (
       headers: { "Content-Type": "text/html; charset=utf-8" },
     });
   });
+
+export function notFoundPage(path: string): string {
+  return page(
+    "404 Not Found – platform-404",
+    `<main class="container">
+  <div class="card" style="text-align:center;padding:3rem 2rem;">
+    <h1 style="font-size:4rem;margin:0;color:var(--text-muted)">404</h1>
+    <p style="font-size:1.25rem;margin:0.5rem 0 1.5rem">Page not found</p>
+    <p style="color:var(--text-muted);font-family:monospace">${escapeHtml(path)}</p>
+    <a href="/" class="btn" style="display:inline-block;margin-top:1rem">&larr; Back to dashboard</a>
+  </div>
+</main>`,
+  );
+}
+
+export const notFoundHandler = (req: Request): Response => {
+  const url = new URL(req.url);
+  return new Response(notFoundPage(url.pathname), {
+    status: 404,
+    headers: { "Content-Type": "text/html; charset=utf-8" },
+  });
+};
 
 const DATE_REGEX = /^\d{4}-\d{2}-\d{2}$/;
 

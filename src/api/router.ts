@@ -22,6 +22,7 @@ import type { StatsService } from "@/services/stats";
 import {
   dailyDetailPageHandler,
   modelsPageHandler,
+  notFoundHandler,
   projectsPageHandler,
   rootHandler,
   sessionPageHandler,
@@ -101,12 +102,15 @@ function liftAsyncHandler(
 /**
  * createRouter - composes all route fragments into a single HttpRouter.
  * Replaces the hand-rolled Bun.serve/URL switch in main.ts.
+ *
+ * Returns an HttpApp (Effect) with RouteNotFound handled as a styled 404 HTML page.
  */
-export function createRouter(): HttpRouter.HttpRouter<
+export function createRouter(): Effect.Effect<
+  HttpServerResponse.HttpServerResponse,
   never,
-  DashboardDb | StatsService
+  DashboardDb | StatsService | HttpServerRequest.HttpServerRequest
 > {
-  return HttpRouter.empty.pipe(
+  const router = HttpRouter.empty.pipe(
     HttpRouter.get("/api/health", liftHandler(healthHandler)),
     HttpRouter.get("/api/stats/overview", liftHandler(statsOverviewHandler)),
     HttpRouter.get("/api/stats/daily", liftHandler(statsDailyHandler)),
@@ -174,5 +178,15 @@ export function createRouter(): HttpRouter.HttpRouter<
       }),
     ),
     HttpRouter.get("/", liftHandler(rootHandler)),
+  );
+
+  return router.pipe(
+    Effect.catchTag("RouteNotFound", () =>
+      Effect.gen(function* () {
+        const serverReq = yield* HttpServerRequest.HttpServerRequest;
+        const webReq = resolveWebRequest(serverReq);
+        return HttpServerResponse.raw(notFoundHandler(webReq));
+      }),
+    ),
   );
 }
