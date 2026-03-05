@@ -2,6 +2,9 @@ tmp/
 .ralph/LOG
 .ralph/DONE
 
+# Playwright CLI snapshot output
+.playwright-cli/
+
 # Logs
 logs
 *.log
