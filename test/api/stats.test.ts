@@ -114,6 +114,16 @@ describe("GET /api/stats/daily", () => {
     expect(body.data.daily).toHaveLength(1);
   });
 
+  test("returns 200 with default last-30-days range when no params given", async () => {
+    const req = new Request("http://localhost:3000/api/stats/daily");
+    const response = await Effect.runPromise(
+      statsDailyHandler(req).pipe(Effect.provide(TestLayer)),
+    );
+    expect(response.status).toBe(200);
+    const body = (await response.json()) as { data: { daily: unknown[] } };
+    expect(Array.isArray(body.data.daily)).toBe(true);
+  });
+
   test("returns 400 when start param is missing", async () => {
     const req = new Request(
       "http://localhost:3000/api/stats/daily?end=2026-01-31",

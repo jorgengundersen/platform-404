@@ -2,6 +2,7 @@ import { Schema } from "@effect/schema";
 import { Effect } from "effect";
 
 import { DateRangeParams } from "@/primitives/schemas/api-params";
+import { formatDate } from "@/primitives/time";
 import { type StatsError, StatsService } from "@/services/stats";
 
 // ---------------------------------------------------------------------------
@@ -40,25 +41,33 @@ export const statsOverviewHandler = (
 
 /**
  * statsDailyHandler - Returns daily stats for a date range.
- * Query params: start (YYYY-MM-DD), end (YYYY-MM-DD) - both required.
+ * Query params: start (YYYY-MM-DD), end (YYYY-MM-DD) - both optional, default to last 30 days.
  */
 export const statsDailyHandler = (
   req: Request,
 ): Effect.Effect<Response, StatsError, StatsService> =>
   Effect.gen(function* () {
     const url = new URL(req.url);
-    const raw = {
-      start: url.searchParams.get("start") ?? undefined,
-      end: url.searchParams.get("end") ?? undefined,
-    };
+    const rawStart = url.searchParams.get("start") ?? undefined;
+    const rawEnd = url.searchParams.get("end") ?? undefined;
 
-    const parseResult = Schema.decodeUnknownEither(DateRangeParams)(raw);
-    if (parseResult._tag === "Left") {
-      return jsonError(
-        "Params start and end must be present and in YYYY-MM-DD format",
-      );
+    let start: string;
+    let end: string;
+
+    if (rawStart === undefined && rawEnd === undefined) {
+      const now = Date.now();
+      end = formatDate(now);
+      start = formatDate(now - 30 * 24 * 60 * 60 * 1000);
+    } else {
+      const raw = { start: rawStart, end: rawEnd };
+      const parseResult = Schema.decodeUnknownEither(DateRangeParams)(raw);
+      if (parseResult._tag === "Left") {
+        return jsonError(
+          "Params start and end must be present and in YYYY-MM-DD format",
+        );
+      }
+      ({ start, end } = parseResult.right);
     }
-    const { start, end } = parseResult.right;
 
     const stats = yield* StatsService;
     const daily = yield* stats.getDailyStats({ start, end });
