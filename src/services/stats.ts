@@ -318,8 +318,8 @@ export const StatsServiceLive: Layer.Layer<StatsService, never, DashboardDb> =
                   total_tokens_reasoning, total_cache_read, total_cache_write,
                   time_created, time_updated
                 FROM sessions
-                WHERE date(time_created / 1000, 'unixepoch') = ?
-                ORDER BY time_created ASC`,
+                WHERE date(time_updated / 1000, 'unixepoch') = ?
+                ORDER BY time_updated ASC`,
               )
               .all(date);
 

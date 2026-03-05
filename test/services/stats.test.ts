@@ -312,6 +312,39 @@ describe("StatsService.getSessionsForDate", () => {
     expect(session.totalCost).toBeCloseTo(0.05, 5);
     expect(session.timeCreated).toBe(1700000000000);
   });
+
+  test("returns session by time_updated date when time_created is on a different day", async () => {
+    // Session created on 2023-11-14 but updated on 2023-11-15.
+    // daily_stats buckets by time_updated, so getSessionsForDate('2023-11-15')
+    // must return this session to stay consistent.
+    const program = Effect.gen(function* () {
+      const { sqlite } = yield* DashboardDb;
+      sqlite.exec(`
+        INSERT INTO sessions (id, project_id, project_name, title, version,
+          summary_additions, summary_deletions, summary_files,
+          message_count, total_cost, total_tokens_input, total_tokens_output,
+          total_tokens_reasoning, total_cache_read, total_cache_write,
+          time_created, time_updated, time_ingested)
+        VALUES
+          ('s-cross-day', 'p1', 'ProjectA', 'Cross-day session', '1.0',
+           0, 0, 0,
+           1, 0.01, 100, 50, 0, 0, 0,
+           1699956000000, 1700042400000, 1700042400000);
+      `);
+      const stats = yield* StatsService;
+      return yield* stats.getSessionsForDate("2023-11-15");
+    });
+
+    const result = await Effect.runPromise(
+      program.pipe(
+        Effect.provide(StatsServiceLive),
+        Effect.provide(DashboardDbTest),
+      ),
+    );
+
+    expect(result).toHaveLength(1);
+    expect(result[0]?.id).toBe("s-cross-day");
+  });
 });
 
 describe("StatsService.getSessions", () => {
