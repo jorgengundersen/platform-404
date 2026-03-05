@@ -110,6 +110,13 @@ describe("dashboard()", () => {
     expect(html).toContain(`href="/projects"`);
   });
 
+  test("renders Top Projects project names as links to /sessions?project=<id>", () => {
+    const html = dashboard(overview, sessions, projects, models);
+    expect(html).toContain(
+      `href="/sessions?project=${encodeURIComponent("p1")}"`,
+    );
+  });
+
   test("renders Top Models quick-glance section with link to /models", () => {
     const html = dashboard(overview, sessions, projects, models);
     expect(html).toContain("Top Models");

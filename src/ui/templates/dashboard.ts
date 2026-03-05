@@ -89,7 +89,7 @@ function topProjectsSection(projects: readonly ProjectStat[]): string {
           .map(
             (p) =>
               `<tr>
-    <td>${escapeHtml(p.projectName ?? p.projectId)}</td>
+    <td><a href="/sessions?project=${encodeURIComponent(p.projectId)}">${escapeHtml(p.projectName ?? p.projectId)}</a></td>
     <td>${p.sessionCount.toLocaleString()}</td>
     <td>${formatCost(p.totalCost)}</td>
   </tr>`,
