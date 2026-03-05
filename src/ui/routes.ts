@@ -262,14 +262,16 @@ export const sessionsListPageHandler = (
       .pipe(Effect.catchAll(() => Effect.succeed([])));
 
     const total = sessions.length;
-    const offset = (pageNum - 1) * limit;
+    const lastPage = Math.ceil(total / limit) || 1;
+    const clampedPage = Math.min(pageNum, lastPage);
+    const offset = (clampedPage - 1) * limit;
     const pageSessions = sessions.slice(offset, offset + limit);
 
     const html = page(
       "Sessions – platform-404",
       sessionsPage({
         sessions: pageSessions,
-        page: pageNum,
+        page: clampedPage,
         total,
         limit,
         projectFilter,

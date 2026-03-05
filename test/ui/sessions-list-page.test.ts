@@ -54,4 +54,49 @@ describe("GET /sessions", () => {
 
     await Effect.runPromise(Effect.provide(program, TestLayer));
   });
+
+  test("clamps out-of-bounds page to last valid page", async () => {
+    const program = Effect.gen(function* () {
+      const { sqlite } = yield* DashboardDb;
+      sqlite
+        .prepare(
+          `INSERT INTO sessions
+            (id, project_id, project_name, title, message_count, total_cost, total_tokens_input,
+             total_tokens_output, total_tokens_reasoning, total_cache_read,
+             total_cache_write, time_created, time_updated)
+           VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+        )
+        .run(
+          "s1",
+          "p1",
+          "my-project",
+          "Test Session",
+          3,
+          0.05,
+          100,
+          200,
+          0,
+          5,
+          10,
+          1000,
+          2000,
+        );
+
+      // With 1 session and limit=50, lastPage=1. Page 999 should be clamped to 1.
+      const req = new Request("http://localhost:3000/sessions?page=999");
+      const response = yield* sessionsListPageHandler(req);
+      const body = yield* Effect.promise(() => response.text());
+
+      expect(response.status).toBe(200);
+      // Should show "1 / 1" not "999 / 1"
+      expect(body).toContain("1 / 1");
+      expect(body).not.toContain("999");
+      // Should show the session (not an empty table)
+      expect(body).toContain("Test Session");
+      // Prev link to page 998 must not appear
+      expect(body).not.toContain("page=998");
+    });
+
+    await Effect.runPromise(Effect.provide(program, TestLayer));
+  });
 });
