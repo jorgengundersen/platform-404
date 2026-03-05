@@ -25,6 +25,7 @@ try {
       id TEXT PRIMARY KEY,
       project_id TEXT,
       title TEXT,
+      time_created INTEGER,
       time_updated INTEGER
     );
 
@@ -54,8 +55,8 @@ try {
   );
 
   db.prepare(
-    "INSERT OR IGNORE INTO session (id, project_id, title, time_updated) VALUES (?, ?, ?, ?)",
-  ).run("sess-dev-1", "proj-dev-1", "Seed Session", now);
+    "INSERT OR IGNORE INTO session (id, project_id, title, time_created, time_updated) VALUES (?, ?, ?, ?, ?)",
+  ).run("sess-dev-1", "proj-dev-1", "Seed Session", now, now);
 
   console.log(`Seeded dev OpenCode DB at ${dbPath}`);
 } finally {

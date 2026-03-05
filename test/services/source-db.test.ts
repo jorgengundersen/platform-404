@@ -17,6 +17,7 @@ describe("SourceDb Effect service", () => {
         id TEXT PRIMARY KEY,
         project_id TEXT,
         title TEXT,
+        time_created INTEGER,
         time_updated INTEGER
       );
       CREATE TABLE project (
@@ -38,9 +39,9 @@ describe("SourceDb Effect service", () => {
         time_created INTEGER,
         time_updated INTEGER
       );
-      INSERT INTO session VALUES ('s1', 'p1', 'Session 1', 1000);
-      INSERT INTO session VALUES ('s2', 'p1', 'Session 2', 2000);
-      INSERT INTO session VALUES ('s3', 'p2', 'Session 3', 3000);
+      INSERT INTO session VALUES ('s1', 'p1', 'Session 1', 500, 1000);
+      INSERT INTO session VALUES ('s2', 'p1', 'Session 2', 1500, 2000);
+      INSERT INTO session VALUES ('s3', 'p2', 'Session 3', 2500, 3000);
       INSERT INTO project VALUES ('p1', 'Project Alpha');
       INSERT INTO project VALUES ('p2', 'Project Beta');
       INSERT INTO message VALUES ('m1', 's1', '{"role":"user"}', 900, 901);

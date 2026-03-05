@@ -9,6 +9,7 @@ export interface SessionRow {
   id: string;
   project_id: string;
   title: string;
+  time_created: number;
   time_updated: number;
 }
 
@@ -85,7 +86,7 @@ export const SourceDbLive = (
               try: () =>
                 sqlite
                   .query(
-                    "SELECT id, project_id, title, time_updated FROM session WHERE time_updated > ? ORDER BY time_updated ASC",
+                    "SELECT id, project_id, title, time_created, time_updated FROM session WHERE time_updated > ? ORDER BY time_updated ASC",
                   )
                   .all(sinceMs) as SessionRow[],
               catch: (cause) =>

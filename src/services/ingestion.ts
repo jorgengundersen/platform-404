@@ -311,8 +311,8 @@ export const IngestionServiceLive: Layer.Layer<
             message_count, total_cost,
             total_tokens_input, total_tokens_output, total_tokens_reasoning,
             total_cache_read, total_cache_write,
-            time_updated, time_ingested
-          ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+            time_created, time_updated, time_ingested
+          ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
           ON CONFLICT(id) DO UPDATE SET
             project_id = excluded.project_id,
             project_name = excluded.project_name,
@@ -360,6 +360,7 @@ export const IngestionServiceLive: Layer.Layer<
             agg.tokens_reasoning,
             agg.cache_read,
             agg.cache_write,
+            session.time_created,
             session.time_updated,
             now,
           );
