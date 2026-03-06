@@ -9,6 +9,47 @@
 - lefthook pre-commit runs format:check, lint, typecheck, test.
 - Env var tests require try/finally cleanup: save original, restore after to prevent cross-test pollution.
 
+## Dev and Test Data Isolation
+
+**CRITICAL: Live data must NEVER be used in dev or test. No exceptions.**
+
+### Correct dev workflow
+
+Always use `make dev`. Never run `bun run dev` directly.
+
+```bash
+make dev        # wipes both dev DBs, seeds fresh dummy data, starts server
+make test       # runs bun test (all tests use :memory: or /tmp/ DBs)
+```
+
+`make dev` sets:
+- `OPENCODE_DB_PATH=.data/opencode.dev.db` — seeded with dummy data, wiped fresh on every run
+- `DASHBOARD_DB_PATH=.data/dashboard.dev.db` — wiped fresh on every run
+
+### Rules for agents
+
+- NEVER run `bun run dev` directly — always `make dev`
+- NEVER set `OPENCODE_DB_PATH` to any path outside `.data/` in this repo
+- NEVER set `OPENCODE_DB_PATH` to `~/.local/share/opencode/opencode.db` or any live DB path
+- NEVER set `DASHBOARD_DB_PATH` to `/data/dashboard.db` (that is the Docker/prod path)
+- Both `OPENCODE_DB_PATH` and `DASHBOARD_DB_PATH` are required — the app will throw if either is missing (no fallback)
+- If you need a running server for screenshots or testing, use `make dev`
+
+### Why this matters
+
+The ingestion loop copies all data from `OPENCODE_DB_PATH` into `DASHBOARD_DB_PATH`. If a live DB is used as the source, all real user sessions are permanently written into `DASHBOARD_DB_PATH` and persist across restarts (the cursor mechanism means the contamination is irreversible without wiping the DB).
+
+`make dev-db` wipes both dev DBs on every run precisely to prevent this.
+
+### Running tests
+
+Tests are always safe: every test uses `:memory:` SQLite or `/tmp/test-*-<timestamp>.db` with cleanup. No test reads from `process.env` without a fully isolated env object.
+
+```bash
+make test       # preferred
+bun test        # equivalent
+```
+
 <!-- BEGIN BEADS INTEGRATION -->
 ## Issue Tracking with bd (beads)
 

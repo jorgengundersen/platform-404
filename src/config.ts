@@ -21,7 +21,10 @@ export function getConfig(
     throw new Error(formatEnvVarError(opencodeDbPath.left));
   }
 
-  const dashboardDbPath = env.DASHBOARD_DB_PATH?.trim() || "/data/dashboard.db";
+  const dashboardDbPath = requiredNonEmptyString(env, "DASHBOARD_DB_PATH");
+  if (Either.isLeft(dashboardDbPath)) {
+    throw new Error(formatEnvVarError(dashboardDbPath.left));
+  }
 
   let syncIntervalMs = 30000;
   const rawInterval = env.SYNC_INTERVAL_MS;
@@ -37,7 +40,7 @@ export function getConfig(
 
   return {
     opencodeDbPath: opencodeDbPath.right,
-    dashboardDbPath,
+    dashboardDbPath: dashboardDbPath.right,
     syncIntervalMs,
   };
 }
