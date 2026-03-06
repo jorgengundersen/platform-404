@@ -87,6 +87,45 @@ describe("GET /sessions/:id (UI)", () => {
     await Effect.runPromise(Effect.provide(program, TestLayer));
   });
 
+  test("shows truncated project_id when project_name is NULL", async () => {
+    const program = Effect.gen(function* () {
+      const { sqlite } = yield* DashboardDb;
+      sqlite
+        .prepare(
+          `INSERT INTO sessions
+            (id, project_id, project_name, title, message_count, total_cost, total_tokens_input,
+             total_tokens_output, total_tokens_reasoning, total_cache_read,
+             total_cache_write, time_created, time_updated)
+           VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+        )
+        .run(
+          "ses_null_proj",
+          "abcdef1234567890",
+          null,
+          "No Project Name",
+          0,
+          0.0,
+          0,
+          0,
+          0,
+          0,
+          0,
+          1000,
+          2000,
+        );
+
+      const req = new Request("http://localhost:3000/sessions/ses_null_proj");
+      const response = yield* sessionPageHandler(req, "ses_null_proj");
+      const body = yield* Effect.promise(() => response.text());
+
+      expect(response.status).toBe(200);
+      // projectName falls back to first 8 chars of projectId
+      expect(body).toContain("abcdef12");
+    });
+
+    await Effect.runPromise(Effect.provide(program, TestLayer));
+  });
+
   test("returns 404 HTML when session not found", async () => {
     const program = Effect.gen(function* () {
       const req = new Request("http://localhost:3000/sessions/no-such-id");
