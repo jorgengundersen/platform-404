@@ -63,7 +63,7 @@ export function sessionDetail(
 
   return `<main class="session-detail">
   <header class="session-header">
-    <a href="/" class="back-link">← Dashboard</a>
+    <a href="/sessions" class="back-link">← Sessions</a>
     <h1>${escapeHtml(session.title || session.id)}</h1>
   </header>
   <section class="session-meta">

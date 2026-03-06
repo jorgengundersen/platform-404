@@ -76,9 +76,13 @@ export function sessionsPage(data: SessionsPageData): string {
     ? ` <span class="filter-note">(project: ${escapeHtml(projectFilter)})</span>`
     : "";
 
+  const backLink = projectFilter
+    ? `<a href="/projects" class="back-link">← Projects</a>`
+    : `<a href="/" class="back-link">← Dashboard</a>`;
+
   return `<main class="sessions-list-page">
   <header class="session-header">
-    <a href="/" class="back-link">← Dashboard</a>
+    ${backLink}
     <h1>Sessions${filterNote}</h1>
   </header>
   <div class="overview-cards">

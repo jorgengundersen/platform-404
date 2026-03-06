@@ -55,6 +55,47 @@ describe("GET /sessions", () => {
     await Effect.runPromise(Effect.provide(program, TestLayer));
   });
 
+  test("back-link reads '← Projects' and points to /projects when project filter is active", async () => {
+    const program = Effect.gen(function* () {
+      const { sqlite } = yield* DashboardDb;
+      sqlite
+        .prepare(
+          `INSERT INTO sessions
+            (id, project_id, project_name, title, message_count, total_cost, total_tokens_input,
+             total_tokens_output, total_tokens_reasoning, total_cache_read,
+             total_cache_write, time_created, time_updated)
+           VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+        )
+        .run(
+          "s2",
+          "proj-abc",
+          "filtered-project",
+          "Filtered Session",
+          1,
+          0.01,
+          100,
+          200,
+          0,
+          0,
+          0,
+          1000,
+          2000,
+        );
+
+      const req = new Request(
+        "http://localhost:3000/sessions?project=proj-abc",
+      );
+      const response = yield* sessionsListPageHandler(req);
+      const body = yield* Effect.promise(() => response.text());
+
+      expect(body).toContain('href="/projects"');
+      expect(body).toContain("← Projects");
+      expect(body).not.toContain('class="back-link">← Dashboard');
+    });
+
+    await Effect.runPromise(Effect.provide(program, TestLayer));
+  });
+
   test("Date Range stat card uses smaller font modifier class", async () => {
     const program = Effect.gen(function* () {
       const { sqlite } = yield* DashboardDb;
