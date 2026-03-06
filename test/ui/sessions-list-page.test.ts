@@ -134,6 +134,45 @@ describe("GET /sessions", () => {
     await Effect.runPromise(Effect.provide(program, TestLayer));
   });
 
+  test("shows truncated projectId when project_name is NULL", async () => {
+    const program = Effect.gen(function* () {
+      const { sqlite } = yield* DashboardDb;
+      sqlite
+        .prepare(
+          `INSERT INTO sessions
+            (id, project_id, project_name, title, message_count, total_cost, total_tokens_input,
+             total_tokens_output, total_tokens_reasoning, total_cache_read,
+             total_cache_write, time_created, time_updated)
+           VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+        )
+        .run(
+          "s-null-proj",
+          "07c33b5c4dd6cd7d65dc7410e1692478dec5e335",
+          null,
+          "No Name Session",
+          1,
+          0.01,
+          100,
+          200,
+          0,
+          0,
+          0,
+          1000,
+          2000,
+        );
+
+      const req = new Request("http://localhost:3000/sessions");
+      const response = yield* sessionsListPageHandler(req);
+      const body = yield* Effect.promise(() => response.text());
+
+      // Should show the first 8 chars of project_id, not empty string
+      expect(body).toContain("07c33b5c");
+      expect(body).not.toContain(">  <"); // no empty td
+    });
+
+    await Effect.runPromise(Effect.provide(program, TestLayer));
+  });
+
   test("clamps out-of-bounds page to last valid page", async () => {
     const program = Effect.gen(function* () {
       const { sqlite } = yield* DashboardDb;

@@ -327,7 +327,7 @@ export const StatsServiceLive: Layer.Layer<StatsService, never, DashboardDb> =
               (r): SessionSummary => ({
                 id: r.id,
                 projectId: r.project_id,
-                projectName: r.project_name ?? "",
+                projectName: r.project_name || r.project_id.slice(0, 8),
                 title: r.title ?? "",
                 messageCount: r.message_count ?? 0,
                 totalCost: r.total_cost ?? 0,
@@ -380,7 +380,7 @@ export const StatsServiceLive: Layer.Layer<StatsService, never, DashboardDb> =
               (r): SessionSummary => ({
                 id: r.id,
                 projectId: r.project_id,
-                projectName: r.project_name ?? "",
+                projectName: r.project_name || r.project_id.slice(0, 8),
                 title: r.title ?? "",
                 messageCount: r.message_count ?? 0,
                 totalCost: r.total_cost ?? 0,
