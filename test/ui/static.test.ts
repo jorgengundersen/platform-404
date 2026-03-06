@@ -86,4 +86,20 @@ describe("GET /static/styles.css", () => {
     );
     expect(modelsMatch).not.toBeNull();
   });
+
+  test(".stat-card has min-height and .overview-cards uses align-items start", async () => {
+    const req = new Request("http://localhost:3000/static/styles.css", {
+      method: "GET",
+    });
+    const response = await staticStylesHandler(req);
+    const body = await response.text();
+    // stat-card must declare min-height so short-value cards look intentional
+    const statCardMinHeight = body.match(/\.stat-card[^}]*min-height\s*:/);
+    expect(statCardMinHeight).not.toBeNull();
+    // overview-cards must use align-items: start so tall cards don't stretch siblings
+    const overviewAlignItems = body.match(
+      /\.overview-cards[^}]*align-items\s*:\s*start/,
+    );
+    expect(overviewAlignItems).not.toBeNull();
+  });
 });
