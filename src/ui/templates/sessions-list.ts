@@ -1,3 +1,4 @@
+import { formatProjectName } from "@/primitives/project";
 import type { SessionSummary } from "@/primitives/schemas/session-summary";
 import { escapeHtml } from "@/ui/templates/page";
 
@@ -73,7 +74,7 @@ export function sessionsPage(data: SessionsPageData): string {
       : sessions.map(sessionRow).join("\n");
 
   const filterNote = projectFilter
-    ? ` <span class="filter-note">(project: ${escapeHtml(projectFilter)})</span>`
+    ? ` <span class="filter-note">(project: ${escapeHtml(formatProjectName(projectFilter))})</span>`
     : "";
 
   const backLink = projectFilter

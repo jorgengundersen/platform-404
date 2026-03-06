@@ -1,3 +1,4 @@
+import { formatProjectName } from "@/primitives/project";
 import type { ProjectStat } from "@/services/stats";
 import { escapeHtml } from "@/ui/templates/page";
 
@@ -7,7 +8,7 @@ function formatCost(cost: number): string {
 
 function projectRow(p: ProjectStat): string {
   return `<tr>
-    <td><a href="/sessions?project=${encodeURIComponent(p.projectId)}">${escapeHtml(p.projectName ?? p.projectId)}</a></td>
+    <td><a href="/sessions?project=${encodeURIComponent(p.projectId)}">${escapeHtml(formatProjectName(p.projectName, p.projectId))}</a></td>
     <td>${p.sessionCount.toLocaleString()}</td>
     <td>${formatCost(p.totalCost)}</td>
     <td>${p.totalTokensInput.toLocaleString()}</td>

@@ -1,4 +1,5 @@
 import { Context, Data, Effect, Layer } from "effect";
+import { formatProjectName } from "@/primitives/project";
 import type { SessionSummary } from "@/primitives/schemas/session-summary";
 import { DashboardDb } from "@/services/dashboard-db";
 
@@ -327,7 +328,7 @@ export const StatsServiceLive: Layer.Layer<StatsService, never, DashboardDb> =
               (r): SessionSummary => ({
                 id: r.id,
                 projectId: r.project_id,
-                projectName: r.project_name || r.project_id.slice(0, 8),
+                projectName: formatProjectName(r.project_name, r.project_id),
                 title: r.title ?? "",
                 messageCount: r.message_count ?? 0,
                 totalCost: r.total_cost ?? 0,
@@ -380,7 +381,7 @@ export const StatsServiceLive: Layer.Layer<StatsService, never, DashboardDb> =
               (r): SessionSummary => ({
                 id: r.id,
                 projectId: r.project_id,
-                projectName: r.project_name || r.project_id.slice(0, 8),
+                projectName: formatProjectName(r.project_name, r.project_id),
                 title: r.title ?? "",
                 messageCount: r.message_count ?? 0,
                 totalCost: r.total_cost ?? 0,
