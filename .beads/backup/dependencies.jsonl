@@ -12,12 +12,15 @@
 {"created_at":"2026-03-04T07:32:14Z","created_by":"Jørgen Gundersen","depends_on_id":"p404-l0k","issue_id":"p404-65c","type":"blocks"}
 {"created_at":"2026-03-04T12:24:59Z","created_by":"Jørgen Gundersen","depends_on_id":"p404-qow","issue_id":"p404-6c2","type":"discovered-from"}
 {"created_at":"2026-03-06T05:46:04Z","created_by":"Jørgen Gundersen","depends_on_id":"p404-auc","issue_id":"p404-87u","type":"discovered-from"}
+{"created_at":"2026-03-06T07:17:39Z","created_by":"Jørgen Gundersen","depends_on_id":"p404-ntd","issue_id":"p404-9kv","type":"discovered-from"}
+{"created_at":"2026-03-06T07:17:50Z","created_by":"Jørgen Gundersen","depends_on_id":"p404-ntd","issue_id":"p404-a27","type":"discovered-from"}
 {"created_at":"2026-03-04T07:31:55Z","created_by":"Jørgen Gundersen","depends_on_id":"p404-380","issue_id":"p404-bb6","type":"blocks"}
 {"created_at":"2026-03-04T07:31:55Z","created_by":"Jørgen Gundersen","depends_on_id":"p404-hx4","issue_id":"p404-bb6","type":"blocks"}
 {"created_at":"2026-03-04T07:31:55Z","created_by":"Jørgen Gundersen","depends_on_id":"p404-l0k","issue_id":"p404-bb6","type":"blocks"}
 {"created_at":"2026-03-04T07:31:55Z","created_by":"Jørgen Gundersen","depends_on_id":"p404-ral","issue_id":"p404-bb6","type":"blocks"}
 {"created_at":"2026-03-04T09:24:09Z","created_by":"Jørgen Gundersen","depends_on_id":"p404-dp6","issue_id":"p404-bzl","type":"child-of"}
 {"created_at":"2026-03-05T08:12:36Z","created_by":"Jørgen Gundersen","depends_on_id":"p404-q3g","issue_id":"p404-cml","type":"discovered-from"}
+{"created_at":"2026-03-06T07:17:50Z","created_by":"Jørgen Gundersen","depends_on_id":"p404-ntd","issue_id":"p404-d99","type":"discovered-from"}
 {"created_at":"2026-03-04T09:24:10Z","created_by":"Jørgen Gundersen","depends_on_id":"p404-dp6","issue_id":"p404-dhm","type":"child-of"}
 {"created_at":"2026-03-04T12:25:45Z","created_by":"Jørgen Gundersen","depends_on_id":"p404-6c2","issue_id":"p404-fky","type":"blocks"}
 {"created_at":"2026-03-04T12:25:45Z","created_by":"Jørgen Gundersen","depends_on_id":"p404-xfj","issue_id":"p404-fky","type":"blocks"}
@@ -43,4 +46,5 @@
 {"created_at":"2026-03-04T07:32:26Z","created_by":"Jørgen Gundersen","depends_on_id":"p404-bb6","issue_id":"p404-vwl","type":"blocks"}
 {"created_at":"2026-03-04T07:32:26Z","created_by":"Jørgen Gundersen","depends_on_id":"p404-pw5","issue_id":"p404-vwl","type":"blocks"}
 {"created_at":"2026-03-04T12:25:18Z","created_by":"Jørgen Gundersen","depends_on_id":"p404-xfj","issue_id":"p404-x2i","type":"blocks"}
+{"created_at":"2026-03-06T07:17:50Z","created_by":"Jørgen Gundersen","depends_on_id":"p404-ntd","issue_id":"p404-x64","type":"discovered-from"}
 {"created_at":"2026-03-04T12:25:09Z","created_by":"Jørgen Gundersen","depends_on_id":"p404-qow","issue_id":"p404-xfj","type":"discovered-from"}
