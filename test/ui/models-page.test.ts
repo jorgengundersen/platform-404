@@ -44,6 +44,8 @@ describe("GET /models", () => {
       expect(body).toContain("← Dashboard");
       expect(body).toContain("Provider");
       expect(body).toContain("anthropic");
+      // Regression: main must use class="models-page" so CSS padding applies
+      expect(body).toContain('class="models-page"');
     });
 
     await Effect.runPromise(Effect.provide(program, TestLayer));
