@@ -179,7 +179,7 @@ a:hover {
 
 .table thead {
   position: sticky;
-  top: 0;
+  top: var(--nav-height);
   background: var(--color-bg);
 }
 
