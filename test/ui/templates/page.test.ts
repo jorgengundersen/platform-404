@@ -19,4 +19,12 @@ describe("page()", () => {
     expect(html).toContain(`href="/models"`);
     expect(html).toContain(`class="site-nav"`);
   });
+
+  test("marks active nav link with aria-current=page when activePath is provided", () => {
+    const html = page("Sessions", "<p>content</p>", "/sessions");
+    expect(html).toContain(`href="/sessions" aria-current="page"`);
+    expect(html).not.toContain(`href="/" aria-current="page"`);
+    expect(html).not.toContain(`href="/projects" aria-current="page"`);
+    expect(html).not.toContain(`href="/models" aria-current="page"`);
+  });
 });

@@ -106,6 +106,7 @@ export const rootHandler = (
     const html = page(
       "platform-404",
       dashboard(overview ?? emptyOverview, sessions, projects, models),
+      "/",
     );
 
     return new Response(html, {
@@ -134,7 +135,11 @@ export const sessionPageHandler = (
 
     if (!sessionRow) {
       return new Response(
-        page("404 – platform-404", "<main><p>Session not found.</p></main>"),
+        page(
+          "404 – platform-404",
+          "<main><p>Session not found.</p></main>",
+          "/sessions",
+        ),
         {
           status: 404,
           headers: { "Content-Type": "text/html; charset=utf-8" },
@@ -184,6 +189,7 @@ export const sessionPageHandler = (
     const html = page(
       `${session.title || session.id} – platform-404`,
       sessionDetail(session, messages),
+      "/sessions",
     );
 
     return new Response(html, {
@@ -213,7 +219,7 @@ export const modelsPageHandler = (
       .getModelBreakdown()
       .pipe(Effect.catchAll(() => Effect.succeed([])));
 
-    const html = page("Models – platform-404", modelsPage(models));
+    const html = page("Models – platform-404", modelsPage(models), "/models");
 
     return new Response(html, {
       status: 200,
@@ -231,7 +237,11 @@ export const projectsPageHandler = (
       .getProjectBreakdown()
       .pipe(Effect.catchAll(() => Effect.succeed([])));
 
-    const html = page("Projects – platform-404", projectsPage(projects));
+    const html = page(
+      "Projects – platform-404",
+      projectsPage(projects),
+      "/projects",
+    );
 
     return new Response(html, {
       status: 200,
@@ -276,6 +286,7 @@ export const sessionsListPageHandler = (
         limit,
         projectFilter,
       }),
+      "/sessions",
     );
 
     return new Response(html, {
@@ -341,6 +352,7 @@ export const dailyDetailPageHandler = (
     const html = page(
       `${date} – platform-404`,
       dailyDetailPage({ date, stat, sessions }),
+      "/",
     );
 
     return new Response(html, {

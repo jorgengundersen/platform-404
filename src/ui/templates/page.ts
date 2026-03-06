@@ -10,19 +10,31 @@ export function escapeHtml(str: string): string {
   return str.replace(/[&<>"']/g, (c) => ESC[c] ?? c);
 }
 
-function nav(): string {
+const NAV_LINKS: { href: string; label: string }[] = [
+  { href: "/", label: "Dashboard" },
+  { href: "/sessions", label: "Sessions" },
+  { href: "/projects", label: "Projects" },
+  { href: "/models", label: "Models" },
+];
+
+function nav(activePath?: string): string {
+  const links = NAV_LINKS.map(({ href, label }) => {
+    const active = activePath === href ? ` aria-current="page"` : "";
+    return `    <li><a href="${href}"${active}>${label}</a></li>`;
+  }).join("\n");
   return `<nav class="site-nav">
   <a class="site-nav__brand" href="/">platform-404</a>
   <ul class="site-nav__links">
-    <li><a href="/">Dashboard</a></li>
-    <li><a href="/sessions">Sessions</a></li>
-    <li><a href="/projects">Projects</a></li>
-    <li><a href="/models">Models</a></li>
+${links}
   </ul>
 </nav>`;
 }
 
-export function page(title: string, content: string): string {
+export function page(
+  title: string,
+  content: string,
+  activePath?: string,
+): string {
   return `<!DOCTYPE html>
 <html lang="en">
 <head>
@@ -32,7 +44,7 @@ export function page(title: string, content: string): string {
   <link rel="stylesheet" href="/static/styles.css">
 </head>
 <body>
-${nav()}
+${nav(activePath)}
 ${content}
 </body>
 </html>`;

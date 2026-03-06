@@ -88,6 +88,11 @@ a:hover {
   text-decoration: none;
 }
 
+.site-nav__links a[aria-current="page"] {
+  color: var(--color-text);
+  font-weight: 600;
+}
+
 /* Layout */
 
 .dashboard,
