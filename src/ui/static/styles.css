@@ -167,6 +167,7 @@ a:hover {
 .daily-list,
 .sessions-table,
 .messages-list {
+  margin-top: calc(var(--gap) * 2);
   margin-bottom: calc(var(--gap) * 2);
 }
 

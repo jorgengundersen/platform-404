@@ -57,6 +57,17 @@ describe("GET /static/styles.css", () => {
     expect(combinedSelectorMatch).not.toBeNull();
   });
 
+  test(".sessions-table has margin-top for spacing below overview-cards", async () => {
+    const req = new Request("http://localhost:3000/static/styles.css", {
+      method: "GET",
+    });
+    const response = await staticStylesHandler(req);
+    const body = await response.text();
+    // .sessions-table must declare margin-top so it gets breathing room after .overview-cards
+    const marginTopMatch = body.match(/\.sessions-table[^}]*margin-top\s*:/);
+    expect(marginTopMatch).not.toBeNull();
+  });
+
   test(".projects-page and .models-page have same layout as .dashboard", async () => {
     const req = new Request("http://localhost:3000/static/styles.css", {
       method: "GET",
