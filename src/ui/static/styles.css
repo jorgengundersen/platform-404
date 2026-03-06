@@ -153,6 +153,10 @@ a:hover {
   color: var(--color-text);
 }
 
+.stat-card__value--sm {
+  font-size: 1rem;
+}
+
 /* Tables */
 
 .daily-list,

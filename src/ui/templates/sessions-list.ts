@@ -92,7 +92,7 @@ export function sessionsPage(data: SessionsPageData): string {
     </div>
     <div class="stat-card">
       <h2 class="stat-card__label">Date Range</h2>
-      <p class="stat-card__value">${escapeHtml(dateRange)}</p>
+      <p class="stat-card__value stat-card__value--sm">${escapeHtml(dateRange)}</p>
     </div>
   </div>
   <section class="sessions-table">

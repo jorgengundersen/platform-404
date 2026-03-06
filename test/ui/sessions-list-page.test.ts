@@ -55,6 +55,44 @@ describe("GET /sessions", () => {
     await Effect.runPromise(Effect.provide(program, TestLayer));
   });
 
+  test("Date Range stat card uses smaller font modifier class", async () => {
+    const program = Effect.gen(function* () {
+      const { sqlite } = yield* DashboardDb;
+      sqlite
+        .prepare(
+          `INSERT INTO sessions
+            (id, project_id, project_name, title, message_count, total_cost, total_tokens_input,
+             total_tokens_output, total_tokens_reasoning, total_cache_read,
+             total_cache_write, time_created, time_updated)
+           VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+        )
+        .run(
+          "s1",
+          "p1",
+          "my-project",
+          "Test Session",
+          3,
+          0.05,
+          100,
+          200,
+          0,
+          5,
+          10,
+          1000,
+          2000,
+        );
+
+      const req = new Request("http://localhost:3000/sessions");
+      const response = yield* sessionsListPageHandler(req);
+      const body = yield* Effect.promise(() => response.text());
+
+      // Date Range value should use the smaller modifier class to prevent overflow
+      expect(body).toContain('class="stat-card__value stat-card__value--sm"');
+    });
+
+    await Effect.runPromise(Effect.provide(program, TestLayer));
+  });
+
   test("clamps out-of-bounds page to last valid page", async () => {
     const program = Effect.gen(function* () {
       const { sqlite } = yield* DashboardDb;
