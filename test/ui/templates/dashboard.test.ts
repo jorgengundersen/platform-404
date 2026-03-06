@@ -57,6 +57,12 @@ const models: ModelStat[] = [
 ];
 
 describe("dashboard()", () => {
+  test("uses dashboard-header class, not session-header, for the page header", () => {
+    const html = dashboard(overview, sessions, projects, models);
+    expect(html).toContain('class="dashboard-header"');
+    expect(html).not.toContain('class="session-header"');
+  });
+
   test("renders linked stat cards wrapping Sessions, Messages, Total Cost, Avg Cost/Session in <a> to /sessions", () => {
     const html = dashboard(overview, sessions, projects, models);
     // Sessions card → /sessions

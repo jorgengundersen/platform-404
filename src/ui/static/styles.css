@@ -126,6 +126,18 @@ a:hover {
   white-space: nowrap;
 }
 
+.dashboard-header {
+  padding-block: var(--gap);
+  border-bottom: 1px solid var(--color-border);
+  margin-bottom: calc(var(--gap) * 2);
+}
+
+.dashboard-header h1 {
+  margin: 0;
+  font-size: 1.5rem;
+  color: var(--color-accent);
+}
+
 /* Overview cards */
 
 .overview-cards {

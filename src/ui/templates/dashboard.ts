@@ -151,7 +151,7 @@ export function dashboard(
   models: readonly ModelStat[],
 ): string {
   return `<main class="dashboard">
-  <header class="session-header">
+  <header class="dashboard-header">
     <h1>platform-404</h1>
   </header>
   ${overviewCards(stats)}
