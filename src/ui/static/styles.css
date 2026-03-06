@@ -92,7 +92,9 @@ a:hover {
 
 .dashboard,
 .session-detail,
-.sessions-list-page {
+.sessions-list-page,
+.projects-page,
+.models-page {
   max-width: 1200px;
   margin: 0 auto;
   padding: var(--gap);

@@ -56,4 +56,23 @@ describe("GET /static/styles.css", () => {
     );
     expect(combinedSelectorMatch).not.toBeNull();
   });
+
+  test(".projects-page and .models-page have same layout as .dashboard", async () => {
+    const req = new Request("http://localhost:3000/static/styles.css", {
+      method: "GET",
+    });
+    const response = await staticStylesHandler(req);
+    const body = await response.text();
+    // Both classes must appear in the same selector block as .dashboard
+    expect(body).toContain(".projects-page");
+    expect(body).toContain(".models-page");
+    const projectsMatch = body.match(
+      /\.dashboard[^{]*\.projects-page[^{]*{|\.projects-page[^{]*\.dashboard[^{]*{/,
+    );
+    expect(projectsMatch).not.toBeNull();
+    const modelsMatch = body.match(
+      /\.dashboard[^{]*\.models-page[^{]*{|\.models-page[^{]*\.dashboard[^{]*{/,
+    );
+    expect(modelsMatch).not.toBeNull();
+  });
 });
