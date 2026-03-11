@@ -476,3 +476,79 @@ describe("StatsService.getTrendSeries", () => {
     }
   });
 });
+
+describe("StatsService attention feeds", () => {
+  test("returns deterministic anomalies and top 5 expensive sessions for selected range", async () => {
+    const originalNow = Date.now;
+    Date.now = () => Date.parse("2023-11-20T12:00:00.000Z");
+
+    try {
+      const program = Effect.gen(function* () {
+        const { sqlite } = yield* DashboardDb;
+
+        sqlite.exec(`
+          INSERT INTO daily_stats (date, session_count, message_count, total_cost,
+            total_tokens_input, total_tokens_output, total_tokens_reasoning,
+            total_cache_read, total_cache_write, time_updated)
+          VALUES
+            ('2023-11-17', 1, 1, 10, 100, 100, 0, 0, 0, 1700222400000),
+            ('2023-11-18', 1, 1, 120, 100, 100, 0, 0, 0, 1700308800000);
+
+          INSERT INTO messages (id, session_id, role, provider_id, model_id, agent,
+            cost, tokens_input, tokens_output, tokens_reasoning, cache_read, cache_write,
+            time_created, time_ingested)
+          VALUES
+            ('a1', 's1', 'assistant', 'anthropic', 'claude-3-5-sonnet', 'agent',
+             2, 100, 100, 0, 0, 0, 1700222400000, 1700222400000),
+            ('a2', 's2', 'assistant', 'anthropic', 'claude-3-5-sonnet', 'agent',
+             10, 100, 100, 0, 0, 0, 1700308800000, 1700308800000);
+
+          INSERT INTO sessions (id, project_id, project_name, title, version,
+            summary_additions, summary_deletions, summary_files,
+            message_count, total_cost, total_tokens_input, total_tokens_output,
+            total_tokens_reasoning, total_cache_read, total_cache_write,
+            time_created, time_updated, time_ingested)
+          VALUES
+            ('es1', 'p1', 'ProjectA', 'Expensive 1', '1.0', 0, 0, 0,
+             1, 110, 0, 0, 0, 0, 0, 1700222400000, 1700222400000, 1700222400000),
+            ('es2', 'p1', 'ProjectA', 'Expensive 2', '1.0', 0, 0, 0,
+             1, 90, 0, 0, 0, 0, 0, 1700222400000, 1700222400000, 1700222400000),
+            ('es3', 'p1', 'ProjectA', 'Expensive 3', '1.0', 0, 0, 0,
+             1, 70, 0, 0, 0, 0, 0, 1700222400000, 1700222400000, 1700222400000),
+            ('es4', 'p1', 'ProjectA', 'Expensive 4', '1.0', 0, 0, 0,
+             1, 50, 0, 0, 0, 0, 0, 1700222400000, 1700222400000, 1700222400000),
+            ('es5', 'p1', 'ProjectA', 'Expensive 5', '1.0', 0, 0, 0,
+             1, 30, 0, 0, 0, 0, 0, 1700222400000, 1700222400000, 1700222400000),
+            ('es6', 'p1', 'ProjectA', 'Expensive 6', '1.0', 0, 0, 0,
+             1, 10, 0, 0, 0, 0, 0, 1700222400000, 1700222400000, 1700222400000);
+        `);
+
+        const stats = yield* StatsService;
+        const anomalies = yield* stats.getAnomalies({ range: "7d" });
+        const expensiveSessions = yield* stats.getExpensiveSessions({
+          range: "7d",
+        });
+
+        return { anomalies, expensiveSessions };
+      });
+
+      const result = await Effect.runPromise(
+        program.pipe(
+          Effect.provide(StatsServiceLive),
+          Effect.provide(DashboardDbTest),
+        ),
+      );
+
+      expect(result.anomalies.some((a) => a.type === "cost_spike")).toBeTrue();
+      expect(result.anomalies.some((a) => a.type === "model_spike")).toBeTrue();
+      expect(result.anomalies[0]?.href.startsWith("/daily/")).toBeTrue();
+
+      expect(result.expensiveSessions).toHaveLength(5);
+      expect(result.expensiveSessions[0]?.sessionId).toBe("es1");
+      expect(result.expensiveSessions[4]?.sessionId).toBe("es5");
+      expect(result.expensiveSessions[0]?.href).toBe("/sessions/es1");
+    } finally {
+      Date.now = originalNow;
+    }
+  });
+});

@@ -87,6 +87,22 @@ export interface TrendPoint {
   readonly tokensReasoning: number;
 }
 
+export interface AnomalyItem {
+  readonly type: "cost_spike" | "model_spike";
+  readonly date: string;
+  readonly severity: "low" | "medium" | "high";
+  readonly message: string;
+  readonly href: string;
+}
+
+export interface ExpensiveSessionItem {
+  readonly sessionId: string;
+  readonly title: string;
+  readonly totalCost: number;
+  readonly date: string;
+  readonly href: string;
+}
+
 // ---------------------------------------------------------------------------
 // Service interface
 // ---------------------------------------------------------------------------
@@ -105,6 +121,12 @@ export class StatsService extends Context.Tag("StatsService")<
     readonly getTrendSeries: (params: {
       range: DashboardRangeQueryParam;
     }) => Effect.Effect<TrendPoint[], StatsError>;
+    readonly getAnomalies: (params: {
+      range: DashboardRangeQueryParam;
+    }) => Effect.Effect<AnomalyItem[], StatsError>;
+    readonly getExpensiveSessions: (params: {
+      range: DashboardRangeQueryParam;
+    }) => Effect.Effect<ExpensiveSessionItem[], StatsError>;
     readonly getModelBreakdown: () => Effect.Effect<ModelStat[], StatsError>;
     readonly getProjectBreakdown: () => Effect.Effect<
       ProjectStat[],
@@ -185,6 +207,25 @@ interface KpiAggregateRow {
   total_cost: number | null;
   total_tokens_input: number | null;
   total_tokens_output: number | null;
+}
+
+interface DailyCostRow {
+  date: string;
+  total_cost: number | null;
+}
+
+interface ModelDailyCostRow {
+  date: string;
+  provider_id: string | null;
+  model_id: string;
+  total_cost: number | null;
+}
+
+interface ExpensiveSessionRow {
+  id: string;
+  title: string | null;
+  total_cost: number | null;
+  date: string;
 }
 
 // ---------------------------------------------------------------------------
@@ -275,6 +316,18 @@ export const StatsServiceLive: Layer.Layer<StatsService, never, DashboardDb> =
         if (range === "7d") return 7;
         if (range === "90d") return 90;
         return 30;
+      };
+
+      const getRangeBounds = (range: DashboardRangeQueryParam) => {
+        const dayMs = 24 * 60 * 60 * 1000;
+        const endMs = Date.now();
+        const startMs = endMs - (getRangeDays(range) - 1) * dayMs;
+        return {
+          startMs,
+          endMs,
+          startDate: formatDate(startMs),
+          endDate: formatDate(endMs),
+        };
       };
 
       const getKpiAggregate = (
@@ -378,11 +431,9 @@ export const StatsServiceLive: Layer.Layer<StatsService, never, DashboardDb> =
       }): Effect.Effect<TrendPoint[], StatsError> =>
         Effect.try({
           try: () => {
-            const dayMs = 24 * 60 * 60 * 1000;
-            const rangeDays = getRangeDays(params.range);
-            const now = Date.now();
-            const end = formatDate(now);
-            const start = formatDate(now - (rangeDays - 1) * dayMs);
+            const { startDate: start, endDate: end } = getRangeBounds(
+              params.range,
+            );
 
             const rows = sqlite
               .query<DailyStatRow, [string, string]>(
@@ -410,6 +461,134 @@ export const StatsServiceLive: Layer.Layer<StatsService, never, DashboardDb> =
           },
           catch: (cause) =>
             new StatsError({ reason: "Failed to get trend series", cause }),
+        });
+
+      const getAnomalySeverity = (ratio: number): "low" | "medium" | "high" => {
+        if (ratio >= 4) return "high";
+        if (ratio >= 3) return "medium";
+        return "low";
+      };
+
+      const getAnomalies = (params: {
+        range: DashboardRangeQueryParam;
+      }): Effect.Effect<AnomalyItem[], StatsError> =>
+        Effect.try({
+          try: () => {
+            const { startMs, endMs, startDate, endDate } = getRangeBounds(
+              params.range,
+            );
+
+            const costRows = sqlite
+              .query<DailyCostRow, [string, string]>(
+                `SELECT date, total_cost
+                 FROM daily_stats
+                 WHERE date >= ? AND date <= ?
+                 ORDER BY date ASC`,
+              )
+              .all(startDate, endDate);
+
+            const anomalies: AnomalyItem[] = [];
+
+            for (let i = 1; i < costRows.length; i++) {
+              const current = costRows[i];
+              const previous = costRows[i - 1];
+              const currentCost = current?.total_cost ?? 0;
+              const previousCost = previous?.total_cost ?? 0;
+              if (previousCost <= 0) continue;
+
+              const ratio = currentCost / previousCost;
+              if (ratio < 2) continue;
+
+              anomalies.push({
+                type: "cost_spike",
+                date: current?.date ?? "",
+                severity: getAnomalySeverity(ratio),
+                message: `Daily spend jumped ${ratio.toFixed(1)}x day-over-day`,
+                href: `/daily/${current?.date ?? ""}`,
+              });
+            }
+
+            const modelRows = sqlite
+              .query<ModelDailyCostRow, [number, number]>(
+                `SELECT
+                   date(time_created / 1000, 'unixepoch') AS date,
+                   provider_id,
+                   model_id,
+                   SUM(cost) AS total_cost
+                 FROM messages
+                 WHERE role = 'assistant'
+                   AND model_id IS NOT NULL
+                   AND time_created >= ?
+                   AND time_created <= ?
+                 GROUP BY date, provider_id, model_id
+                 ORDER BY model_id ASC, provider_id ASC, date ASC`,
+              )
+              .all(startMs, endMs);
+
+            const previousByModel = new Map<string, number>();
+            for (const row of modelRows) {
+              const key = `${row.provider_id ?? "unknown"}:${row.model_id}`;
+              const previousCost = previousByModel.get(key) ?? 0;
+              const currentCost = row.total_cost ?? 0;
+
+              if (previousCost > 0) {
+                const ratio = currentCost / previousCost;
+                if (ratio >= 2) {
+                  anomalies.push({
+                    type: "model_spike",
+                    date: row.date,
+                    severity: getAnomalySeverity(ratio),
+                    message: `${row.model_id} spend jumped ${ratio.toFixed(1)}x day-over-day`,
+                    href: `/daily/${row.date}`,
+                  });
+                }
+              }
+
+              previousByModel.set(key, currentCost);
+            }
+
+            return anomalies.sort((a, b) => b.date.localeCompare(a.date));
+          },
+          catch: (cause) =>
+            new StatsError({ reason: "Failed to get anomalies", cause }),
+        });
+
+      const getExpensiveSessions = (params: {
+        range: DashboardRangeQueryParam;
+      }): Effect.Effect<ExpensiveSessionItem[], StatsError> =>
+        Effect.try({
+          try: () => {
+            const { startMs, endMs } = getRangeBounds(params.range);
+
+            const rows = sqlite
+              .query<ExpensiveSessionRow, [number, number]>(
+                `SELECT
+                   id,
+                   title,
+                   total_cost,
+                   date(time_updated / 1000, 'unixepoch') AS date
+                 FROM sessions
+                 WHERE time_updated >= ? AND time_updated <= ?
+                 ORDER BY total_cost DESC, time_updated DESC
+                 LIMIT 5`,
+              )
+              .all(startMs, endMs);
+
+            return rows.map(
+              (row): ExpensiveSessionItem => ({
+                sessionId: row.id,
+                title: row.title ?? "",
+                totalCost: row.total_cost ?? 0,
+                date: row.date,
+                href: `/sessions/${row.id}`,
+              }),
+            );
+          },
+          catch: (cause) =>
+            new StatsError({
+              reason: "Failed to get expensive sessions",
+              cause,
+            }),
         });
 
       const getModelBreakdown = (): Effect.Effect<ModelStat[], StatsError> =>
@@ -582,6 +761,8 @@ export const StatsServiceLive: Layer.Layer<StatsService, never, DashboardDb> =
         getDailyStats,
         getKpiSummary,
         getTrendSeries,
+        getAnomalies,
+        getExpensiveSessions,
         getModelBreakdown,
         getProjectBreakdown,
         getSessionsForDate,
