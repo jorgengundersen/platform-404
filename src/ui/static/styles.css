@@ -401,7 +401,7 @@ a.stat-card:hover {
 
 @media (max-width: 640px) {
   .overview-cards {
-    grid-template-columns: repeat(2, 1fr);
+    grid-template-columns: 1fr;
   }
 
   .dashboard-row {

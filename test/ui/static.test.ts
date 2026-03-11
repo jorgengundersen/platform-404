@@ -102,4 +102,17 @@ describe("GET /static/styles.css", () => {
     );
     expect(overviewAlignItems).not.toBeNull();
   });
+
+  test("mobile stacks overview cards to one column to avoid KPI clipping", async () => {
+    const req = new Request("http://localhost:3000/static/styles.css", {
+      method: "GET",
+    });
+    const response = await staticStylesHandler(req);
+    const body = await response.text();
+
+    const mobileOverviewCardsSingleColumn = body.match(
+      /@media \(max-width:\s*640px\)[\s\S]*?\.overview-cards\s*\{[^}]*grid-template-columns:\s*1fr\s*;/,
+    );
+    expect(mobileOverviewCardsSingleColumn).not.toBeNull();
+  });
 });
