@@ -369,3 +369,71 @@ describe("StatsService.getSessions", () => {
     expect(session.projectId).toBe("p1");
   });
 });
+
+describe("StatsService.getKpiSummary", () => {
+  test("returns range KPIs with previous-period deltas and nullable deltas when compare is off", async () => {
+    const program = Effect.gen(function* () {
+      const { sqlite } = yield* DashboardDb;
+      const now = Date.now();
+      const dayMs = 24 * 60 * 60 * 1000;
+
+      sqlite.exec(`
+        INSERT INTO sessions (id, project_id, project_name, title, version,
+          summary_additions, summary_deletions, summary_files,
+          message_count, total_cost, total_tokens_input, total_tokens_output,
+          total_tokens_reasoning, total_cache_read, total_cache_write,
+          time_created, time_updated, time_ingested)
+        VALUES
+          ('kpi-c1', 'p1', 'ProjectA', 'Current 1', '1.0',
+           0, 0, 0,
+           1, 10, 100, 300, 0, 0, 0,
+           ${now - dayMs}, ${now - dayMs}, ${now - dayMs}),
+          ('kpi-c2', 'p1', 'ProjectA', 'Current 2', '1.0',
+           0, 0, 0,
+           1, 20, 100, 200, 0, 0, 0,
+           ${now - 2 * dayMs}, ${now - 2 * dayMs}, ${now - 2 * dayMs}),
+          ('kpi-p1', 'p1', 'ProjectA', 'Prev 1', '1.0',
+           0, 0, 0,
+           1, 5, 50, 50, 0, 0, 0,
+           ${now - 8 * dayMs}, ${now - 8 * dayMs}, ${now - 8 * dayMs}),
+          ('kpi-p2', 'p1', 'ProjectA', 'Prev 2', '1.0',
+           0, 0, 0,
+           1, 15, 50, 50, 0, 0, 0,
+           ${now - 10 * dayMs}, ${now - 10 * dayMs}, ${now - 10 * dayMs});
+      `);
+
+      const stats = yield* StatsService;
+      const compareOn = yield* stats.getKpiSummary({
+        range: "7d",
+        compare: true,
+      });
+      const compareOff = yield* stats.getKpiSummary({
+        range: "7d",
+        compare: false,
+      });
+
+      return { compareOn, compareOff };
+    });
+
+    const result = await Effect.runPromise(
+      program.pipe(
+        Effect.provide(StatsServiceLive),
+        Effect.provide(DashboardDbTest),
+      ),
+    );
+
+    expect(result.compareOn.spend.value).toBeCloseTo(30, 5);
+    expect(result.compareOn.spend.deltaPct).toBeCloseTo(0.5, 5);
+    expect(result.compareOn.sessions.value).toBe(2);
+    expect(result.compareOn.sessions.deltaPct).toBeCloseTo(0, 5);
+    expect(result.compareOn.avgCostPerSession.value).toBeCloseTo(15, 5);
+    expect(result.compareOn.avgCostPerSession.deltaPct).toBeCloseTo(0.5, 5);
+    expect(result.compareOn.outputInputRatio.value).toBeCloseTo(2.5, 5);
+    expect(result.compareOn.outputInputRatio.deltaPct).toBeCloseTo(1.5, 5);
+
+    expect(result.compareOff.spend.deltaPct).toBeNull();
+    expect(result.compareOff.sessions.deltaPct).toBeNull();
+    expect(result.compareOff.avgCostPerSession.deltaPct).toBeNull();
+    expect(result.compareOff.outputInputRatio.deltaPct).toBeNull();
+  });
+});

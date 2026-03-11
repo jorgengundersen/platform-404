@@ -1,5 +1,6 @@
 import { Context, Data, Effect, Layer } from "effect";
 import { formatProjectName } from "@/primitives/project";
+import type { DashboardRangeQueryParam } from "@/primitives/schemas/api-params";
 import type { SessionSummary } from "@/primitives/schemas/session-summary";
 import { DashboardDb } from "@/services/dashboard-db";
 
@@ -64,6 +65,18 @@ export interface ProjectStat {
   readonly totalTokensOutput: number;
 }
 
+export interface KpiValue {
+  readonly value: number;
+  readonly deltaPct: number | null;
+}
+
+export interface KpiSummary {
+  readonly spend: KpiValue;
+  readonly sessions: KpiValue;
+  readonly avgCostPerSession: KpiValue;
+  readonly outputInputRatio: KpiValue;
+}
+
 // ---------------------------------------------------------------------------
 // Service interface
 // ---------------------------------------------------------------------------
@@ -75,6 +88,10 @@ export class StatsService extends Context.Tag("StatsService")<
     readonly getDailyStats: (
       range: DateRange,
     ) => Effect.Effect<DailyStat[], StatsError>;
+    readonly getKpiSummary: (params: {
+      range: DashboardRangeQueryParam;
+      compare: boolean;
+    }) => Effect.Effect<KpiSummary, StatsError>;
     readonly getModelBreakdown: () => Effect.Effect<ModelStat[], StatsError>;
     readonly getProjectBreakdown: () => Effect.Effect<
       ProjectStat[],
@@ -148,6 +165,13 @@ interface SessionRow {
   total_cache_write: number | null;
   time_created: number | null;
   time_updated: number | null;
+}
+
+interface KpiAggregateRow {
+  session_count: number;
+  total_cost: number | null;
+  total_tokens_input: number | null;
+  total_tokens_output: number | null;
 }
 
 // ---------------------------------------------------------------------------
@@ -232,6 +256,108 @@ export const StatsServiceLive: Layer.Layer<StatsService, never, DashboardDb> =
           },
           catch: (cause) =>
             new StatsError({ reason: "Failed to get daily stats", cause }),
+        });
+
+      const getRangeDays = (range: DashboardRangeQueryParam): number => {
+        if (range === "7d") return 7;
+        if (range === "90d") return 90;
+        return 30;
+      };
+
+      const getKpiAggregate = (
+        startMs: number,
+        endMs: number,
+      ): KpiAggregateRow =>
+        sqlite
+          .query<KpiAggregateRow, [number, number]>(
+            `SELECT
+              COUNT(*) AS session_count,
+              SUM(total_cost) AS total_cost,
+              SUM(total_tokens_input) AS total_tokens_input,
+              SUM(total_tokens_output) AS total_tokens_output
+            FROM sessions
+            WHERE time_updated >= ? AND time_updated <= ?`,
+          )
+          .get(startMs, endMs) as KpiAggregateRow;
+
+      const toKpiMetrics = (row: KpiAggregateRow) => {
+        const sessions = row.session_count ?? 0;
+        const spend = row.total_cost ?? 0;
+        const tokensInput = row.total_tokens_input ?? 0;
+        const tokensOutput = row.total_tokens_output ?? 0;
+        return {
+          spend,
+          sessions,
+          avgCostPerSession: spend / Math.max(sessions, 1),
+          outputInputRatio: tokensOutput / Math.max(tokensInput, 1),
+        };
+      };
+
+      const toDeltaPct = (current: number, previous: number): number | null => {
+        if (previous === 0) return null;
+        return (current - previous) / previous;
+      };
+
+      const getKpiSummary = (params: {
+        range: DashboardRangeQueryParam;
+        compare: boolean;
+      }): Effect.Effect<KpiSummary, StatsError> =>
+        Effect.try({
+          try: () => {
+            const now = Date.now();
+            const dayMs = 24 * 60 * 60 * 1000;
+            const rangeDays = getRangeDays(params.range);
+            const currentStartMs = now - (rangeDays - 1) * dayMs;
+            const previousStartMs = currentStartMs - rangeDays * dayMs;
+            const previousEndMs = currentStartMs - 1;
+
+            const current = toKpiMetrics(getKpiAggregate(currentStartMs, now));
+            if (!params.compare) {
+              return {
+                spend: { value: current.spend, deltaPct: null },
+                sessions: { value: current.sessions, deltaPct: null },
+                avgCostPerSession: {
+                  value: current.avgCostPerSession,
+                  deltaPct: null,
+                },
+                outputInputRatio: {
+                  value: current.outputInputRatio,
+                  deltaPct: null,
+                },
+              } satisfies KpiSummary;
+            }
+
+            const previous = toKpiMetrics(
+              getKpiAggregate(previousStartMs, previousEndMs),
+            );
+
+            return {
+              spend: {
+                value: current.spend,
+                deltaPct: toDeltaPct(current.spend, previous.spend),
+              },
+              sessions: {
+                value: current.sessions,
+                deltaPct: toDeltaPct(current.sessions, previous.sessions),
+              },
+              avgCostPerSession: {
+                value: current.avgCostPerSession,
+                deltaPct: toDeltaPct(
+                  current.avgCostPerSession,
+                  previous.avgCostPerSession,
+                ),
+              },
+              outputInputRatio: {
+                value: current.outputInputRatio,
+                deltaPct: toDeltaPct(
+                  current.outputInputRatio,
+                  previous.outputInputRatio,
+                ),
+              },
+            } satisfies KpiSummary;
+          },
+          catch: (cause) =>
+            new StatsError({ reason: "Failed to get KPI summary", cause }),
         });
 
       const getModelBreakdown = (): Effect.Effect<ModelStat[], StatsError> =>
@@ -402,6 +528,7 @@ export const StatsServiceLive: Layer.Layer<StatsService, never, DashboardDb> =
       return {
         getOverview,
         getDailyStats,
+        getKpiSummary,
         getModelBreakdown,
         getProjectBreakdown,
         getSessionsForDate,
