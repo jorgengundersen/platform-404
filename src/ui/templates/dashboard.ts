@@ -31,6 +31,162 @@ function formatDate(ms: number): string {
   return new Date(ms).toISOString().slice(0, 10);
 }
 
+function formatDelta(deltaPct: number | null, compare: boolean): string {
+  if (!compare) {
+    return "";
+  }
+  if (deltaPct === null) {
+    return '<p class="stat-card__delta">No baseline</p>';
+  }
+  const sign = deltaPct > 0 ? "+" : "";
+  return `<p class="stat-card__delta">${sign}${deltaPct.toFixed(1)}% vs previous period</p>`;
+}
+
+function heroSection(v2Data: DashboardV2Data): string {
+  const { kpis } = v2Data;
+  const spend = kpis?.spend ?? { value: 0, deltaPct: null };
+  const sessions = kpis?.sessions ?? { value: 0, deltaPct: null };
+  const avgCostPerSession = kpis?.avgCostPerSession ?? {
+    value: 0,
+    deltaPct: null,
+  };
+  const outputInputRatio = kpis?.outputInputRatio ?? {
+    value: 0,
+    deltaPct: null,
+  };
+
+  return `<section class="overview-cards dashboard-hero" aria-label="Hero KPIs">
+  <h2>Hero KPIs</h2>
+  <a class="stat-card" href="/sessions">
+    <h3 class="stat-card__label">Spend</h3>
+    <p class="stat-card__value">${formatCost(spend.value)}</p>
+    ${formatDelta(spend.deltaPct, v2Data.compare)}
+  </a>
+  <a class="stat-card" href="/sessions">
+    <h3 class="stat-card__label">Sessions</h3>
+    <p class="stat-card__value">${sessions.value.toLocaleString()}</p>
+    ${formatDelta(sessions.deltaPct, v2Data.compare)}
+  </a>
+  <a class="stat-card" href="/sessions">
+    <h3 class="stat-card__label">Avg Cost / Session</h3>
+    <p class="stat-card__value">${formatCost(avgCostPerSession.value)}</p>
+    ${formatDelta(avgCostPerSession.deltaPct, v2Data.compare)}
+  </a>
+  <a class="stat-card" href="/models">
+    <h3 class="stat-card__label">Output/Input Ratio</h3>
+    <p class="stat-card__value">${outputInputRatio.value.toFixed(2)}</p>
+    ${formatDelta(outputInputRatio.deltaPct, v2Data.compare)}
+  </a>
+</section>`;
+}
+
+function trendsSection(v2Data: DashboardV2Data): string {
+  const costItems = v2Data.trends
+    .map(
+      (point) => `<li>
+    <a href="/daily/${escapeHtml(point.date)}">${escapeHtml(point.date)}</a>
+    <span>${formatCost(point.cost)}</span>
+  </li>`,
+    )
+    .join("\n");
+
+  const sessionItems = v2Data.trends
+    .map(
+      (point) => `<li>
+    <a href="/daily/${escapeHtml(point.date)}">${escapeHtml(point.date)}</a>
+    <span>${point.sessions.toLocaleString()} sessions</span>
+  </li>`,
+    )
+    .join("\n");
+
+  return `<section class="dashboard-row dashboard-trends" aria-label="Trends">
+  <h2>Trends</h2>
+  <article class="quick-section">
+    <div class="quick-section__header"><h3>Cost trend</h3></div>
+    ${v2Data.trends.length === 0 ? '<p class="empty">No trend data.</p>' : `<ul class="table">${costItems}</ul>`}
+  </article>
+  <article class="quick-section">
+    <div class="quick-section__header"><h3>Sessions/day</h3></div>
+    ${v2Data.trends.length === 0 ? '<p class="empty">No trend data.</p>' : `<ul class="table">${sessionItems}</ul>`}
+  </article>
+</section>`;
+}
+
+function projectShareHref(item: CostShareItem): string {
+  return `/sessions?project=${encodeURIComponent(item.key)}`;
+}
+
+function driversSection(v2Data: DashboardV2Data): string {
+  const projectItems = v2Data.projectCostShare
+    .map(
+      (item) => `<li>
+    <a href="${projectShareHref(item)}">${escapeHtml(item.label)}</a>
+    <span>${formatCost(item.cost)} (${item.sharePct.toFixed(1)}%)</span>
+  </li>`,
+    )
+    .join("\n");
+
+  const modelItems = v2Data.modelCostShare
+    .map(
+      (item) => `<li>
+    <a href="/models">${escapeHtml(item.label)}</a>
+    <span>${formatCost(item.cost)} (${item.sharePct.toFixed(1)}%)</span>
+  </li>`,
+    )
+    .join("\n");
+
+  return `<section class="dashboard-row dashboard-drivers" aria-label="Cost Drivers">
+  <h2>Cost Drivers</h2>
+  <article class="quick-section">
+    <div class="quick-section__header"><h3>Top projects</h3></div>
+    ${v2Data.projectCostShare.length === 0 ? '<p class="empty">No project cost share data.</p>' : `<ul class="table">${projectItems}</ul>`}
+  </article>
+  <article class="quick-section">
+    <div class="quick-section__header"><h3>Top models</h3></div>
+    ${v2Data.modelCostShare.length === 0 ? '<p class="empty">No model cost share data.</p>' : `<ul class="table">${modelItems}</ul>`}
+  </article>
+</section>`;
+}
+
+function attentionSection(v2Data: DashboardV2Data): string {
+  const anomalyItems = v2Data.anomalies
+    .map(
+      (item) => `<li>
+    <a href="${escapeHtml(item.href)}">${escapeHtml(item.message)}</a>
+    <span>${escapeHtml(item.severity.toUpperCase())} - ${escapeHtml(item.date)}</span>
+  </li>`,
+    )
+    .join("\n");
+
+  const expensiveItems = v2Data.expensiveSessions
+    .map(
+      (item) => `<li>
+    <a href="${escapeHtml(item.href)}">${escapeHtml(item.title || item.sessionId)}</a>
+    <span>${formatCost(item.totalCost)} - ${escapeHtml(item.date)}</span>
+  </li>`,
+    )
+    .join("\n");
+
+  return `<section class="dashboard-row dashboard-attention" aria-label="Needs Attention">
+  <h2>Needs Attention</h2>
+  <article class="quick-section">
+    <div class="quick-section__header"><h3>Anomalies</h3></div>
+    ${v2Data.anomalies.length === 0 ? '<p class="empty">No anomalies found.</p>' : `<ul class="table">${anomalyItems}</ul>`}
+  </article>
+  <article class="quick-section">
+    <div class="quick-section__header"><h3>Most expensive sessions</h3></div>
+    ${v2Data.expensiveSessions.length === 0 ? '<p class="empty">No expensive sessions found.</p>' : `<ul class="table">${expensiveItems}</ul>`}
+  </article>
+</section>`;
+}
+
+function v2Sections(v2Data: DashboardV2Data): string {
+  return `${heroSection(v2Data)}
+  ${trendsSection(v2Data)}
+  ${driversSection(v2Data)}
+  ${attentionSection(v2Data)}`;
+}
+
 function overviewCards(stats: Overview): string {
   return `<section class="overview-cards">
   <a class="stat-card" href="/sessions">
@@ -175,12 +331,13 @@ export function dashboard(
   const v2Payload = v2Data
     ? `<script id="dashboard-v2-data" type="application/json">${escapeHtml(JSON.stringify(v2Data))}</script>`
     : "";
+  const topSection = v2Data ? v2Sections(v2Data) : overviewCards(stats);
 
   return `<main class="dashboard">
   <header class="dashboard-header">
     <h1>platform-404</h1>
   </header>
-  ${overviewCards(stats)}
+  ${topSection}
   ${v2Payload}
   ${recentSessionsSection(sessions)}
   ${topProjectsSection(projects)}

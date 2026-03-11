@@ -1,6 +1,14 @@
 import { describe, expect, test } from "bun:test";
 import type { SessionSummary } from "@/primitives/schemas/session-summary";
-import type { ModelStat, Overview, ProjectStat } from "@/services/stats";
+import type {
+  AnomalyItem,
+  CostShareItem,
+  KpiSummary,
+  ModelStat,
+  Overview,
+  ProjectStat,
+  TrendPoint,
+} from "@/services/stats";
 import { dashboard } from "@/ui/templates/dashboard";
 
 const overview: Overview = {
@@ -53,6 +61,47 @@ const models: ModelStat[] = [
     totalCost: 0.8,
     totalTokensInput: 8000,
     totalTokensOutput: 4000,
+  },
+];
+
+const kpis: KpiSummary = {
+  spend: { value: 1.2, deltaPct: 10 },
+  sessions: { value: 6, deltaPct: 20 },
+  avgCostPerSession: { value: 0.2, deltaPct: 5 },
+  outputInputRatio: { value: 0.5, deltaPct: -10 },
+};
+
+const trends: TrendPoint[] = [
+  {
+    date: "2026-03-01",
+    cost: 0.4,
+    sessions: 2,
+    tokensInput: 1000,
+    tokensOutput: 500,
+    tokensReasoning: 100,
+  },
+];
+
+const projectCostShare: CostShareItem[] = [
+  { label: "my-project", key: "p1", cost: 0.6, sharePct: 75 },
+];
+
+const modelCostShare: CostShareItem[] = [
+  {
+    label: "claude-3-5-sonnet",
+    key: "claude-3-5-sonnet",
+    cost: 0.5,
+    sharePct: 62.5,
+  },
+];
+
+const anomalies: AnomalyItem[] = [
+  {
+    type: "cost_spike",
+    date: "2026-03-01",
+    severity: "high",
+    message: "Cost jumped 2x vs baseline",
+    href: "/daily/2026-03-01",
   },
 ];
 
@@ -133,5 +182,45 @@ describe("dashboard()", () => {
     const html = dashboard(overview, sessions, projects, models);
     const date = new Date(2000).toISOString().slice(0, 10); // "1970-01-01"
     expect(html).toContain(`<a href="/daily/${date}">${date}</a>`);
+  });
+
+  test("renders V2 sections in required order with drill-down links and text fallbacks", () => {
+    const html = dashboard(overview, sessions, projects, models, {
+      range: "7d",
+      compare: true,
+      kpis,
+      trends,
+      projectCostShare,
+      modelCostShare,
+      anomalies,
+      expensiveSessions: [
+        {
+          sessionId: "s1",
+          title: "Test Session",
+          totalCost: 0.3,
+          date: "2026-03-01",
+          href: "/sessions/s1",
+        },
+      ],
+    });
+
+    const heroIndex = html.indexOf("Hero KPIs");
+    const trendsIndex = html.indexOf("Trends");
+    const driversIndex = html.indexOf("Cost Drivers");
+    const attentionIndex = html.indexOf("Needs Attention");
+    const quickIndex = html.indexOf("Recent Sessions");
+
+    expect(heroIndex).toBeGreaterThan(-1);
+    expect(trendsIndex).toBeGreaterThan(heroIndex);
+    expect(driversIndex).toBeGreaterThan(trendsIndex);
+    expect(attentionIndex).toBeGreaterThan(driversIndex);
+    expect(quickIndex).toBeGreaterThan(attentionIndex);
+
+    expect(html).toContain('href="/daily/2026-03-01"');
+    expect(html).toContain('href="/sessions?project=p1"');
+    expect(html).toContain('href="/models"');
+    expect(html).toContain('href="/sessions/s1"');
+    expect(html).toContain("$0.4000");
+    expect(html).toContain("75.0%");
   });
 });
