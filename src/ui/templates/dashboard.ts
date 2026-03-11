@@ -57,22 +57,22 @@ function heroSection(v2Data: DashboardV2Data): string {
 
   return `<section class="overview-cards dashboard-hero" aria-label="Hero KPIs">
   <h2>Hero KPIs</h2>
-  <a class="stat-card" href="/sessions">
+  <a class="stat-card stat-card--spend" href="/sessions">
     <h3 class="stat-card__label">Spend</h3>
     <p class="stat-card__value">${formatCost(spend.value)}</p>
     ${formatDelta(spend.deltaPct, v2Data.compare)}
   </a>
-  <a class="stat-card" href="/sessions">
+  <a class="stat-card stat-card--usage" href="/sessions">
     <h3 class="stat-card__label">Sessions</h3>
     <p class="stat-card__value">${sessions.value.toLocaleString()}</p>
     ${formatDelta(sessions.deltaPct, v2Data.compare)}
   </a>
-  <a class="stat-card" href="/sessions">
+  <a class="stat-card stat-card--spend" href="/sessions">
     <h3 class="stat-card__label">Avg Cost / Session</h3>
     <p class="stat-card__value">${formatCost(avgCostPerSession.value)}</p>
     ${formatDelta(avgCostPerSession.deltaPct, v2Data.compare)}
   </a>
-  <a class="stat-card" href="/models">
+  <a class="stat-card stat-card--usage" href="/models">
     <h3 class="stat-card__label">Output/Input Ratio</h3>
     <p class="stat-card__value">${outputInputRatio.value.toFixed(2)}</p>
     ${formatDelta(outputInputRatio.deltaPct, v2Data.compare)}
@@ -101,11 +101,11 @@ function trendsSection(v2Data: DashboardV2Data): string {
 
   return `<section class="dashboard-row dashboard-trends" aria-label="Trends">
   <h2>Trends</h2>
-  <article class="quick-section">
+  <article class="quick-section quick-section--chart quick-section--spend">
     <div class="quick-section__header"><h3>Cost trend</h3></div>
     ${v2Data.trends.length === 0 ? '<p class="empty">No trend data.</p>' : `<ul class="table">${costItems}</ul>`}
   </article>
-  <article class="quick-section">
+  <article class="quick-section quick-section--chart quick-section--usage">
     <div class="quick-section__header"><h3>Sessions/day</h3></div>
     ${v2Data.trends.length === 0 ? '<p class="empty">No trend data.</p>' : `<ul class="table">${sessionItems}</ul>`}
   </article>
@@ -153,7 +153,7 @@ function attentionSection(v2Data: DashboardV2Data): string {
     .map(
       (item) => `<li>
     <a href="${escapeHtml(item.href)}">${escapeHtml(item.message)}</a>
-    <span>${escapeHtml(item.severity.toUpperCase())} - ${escapeHtml(item.date)}</span>
+    <span><strong>${escapeHtml(item.severity.toUpperCase())} alert</strong> - ${escapeHtml(item.date)}</span>
   </li>`,
     )
     .join("\n");
@@ -169,7 +169,7 @@ function attentionSection(v2Data: DashboardV2Data): string {
 
   return `<section class="dashboard-row dashboard-attention" aria-label="Needs Attention">
   <h2>Needs Attention</h2>
-  <article class="quick-section">
+  <article class="quick-section quick-section--alert">
     <div class="quick-section__header"><h3>Anomalies</h3></div>
     ${v2Data.anomalies.length === 0 ? '<p class="empty">No anomalies found.</p>' : `<ul class="table">${anomalyItems}</ul>`}
   </article>

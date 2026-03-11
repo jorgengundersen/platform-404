@@ -10,6 +10,9 @@
   --radius: 6px;
   --gap: 1rem;
   --nav-height: 3rem;
+  --color-spend: #f97316;
+  --color-usage: #06b6d4;
+  --color-alert: #ef4444;
 }
 
 *,
@@ -176,6 +179,14 @@ a:hover {
   font-size: 1rem;
 }
 
+.stat-card--spend {
+  border-top: 2px solid color-mix(in srgb, var(--color-spend) 70%, white 30%);
+}
+
+.stat-card--usage {
+  border-top: 2px solid color-mix(in srgb, var(--color-usage) 70%, white 30%);
+}
+
 /* Tables */
 
 .daily-list,
@@ -199,6 +210,25 @@ a:hover {
   width: 100%;
   border-collapse: collapse;
   font-size: 0.875rem;
+}
+
+ul.table {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+}
+
+ul.table li {
+  display: flex;
+  justify-content: space-between;
+  gap: var(--gap);
+  padding: 0.5rem 0.75rem;
+  border-bottom: 1px solid var(--color-border);
+}
+
+ul.table li span {
+  text-align: right;
+  white-space: nowrap;
 }
 
 .table thead {
@@ -283,6 +313,48 @@ a.stat-card:hover {
   margin-bottom: calc(var(--gap) * 2);
 }
 
+.dashboard-row {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: var(--gap);
+  margin-bottom: calc(var(--gap) * 2);
+}
+
+.dashboard-row h2 {
+  grid-column: 1 / -1;
+  margin: 0;
+  font-size: 1rem;
+  color: var(--color-muted);
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+}
+
+.quick-section--chart,
+.quick-section--alert {
+  background: var(--color-surface);
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius);
+  padding: var(--gap);
+  min-width: 0;
+}
+
+.quick-section--spend {
+  border-left: 3px solid var(--color-spend);
+}
+
+.quick-section--usage {
+  border-left: 3px solid var(--color-usage);
+}
+
+.quick-section--alert {
+  border-left: 3px solid var(--color-alert);
+}
+
+.quick-section--alert strong {
+  color: var(--color-alert);
+  text-transform: uppercase;
+}
+
 .quick-section__header {
   display: flex;
   align-items: center;
@@ -330,6 +402,20 @@ a.stat-card:hover {
 @media (max-width: 640px) {
   .overview-cards {
     grid-template-columns: repeat(2, 1fr);
+  }
+
+  .dashboard-row {
+    grid-template-columns: 1fr;
+  }
+
+  ul.table li {
+    flex-direction: column;
+    align-items: flex-start;
+  }
+
+  ul.table li span {
+    white-space: normal;
+    text-align: left;
   }
 
   .table {

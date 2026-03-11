@@ -223,4 +223,22 @@ describe("dashboard()", () => {
     expect(html).toContain("$0.4000");
     expect(html).toContain("75.0%");
   });
+
+  test("adds semantic style hooks for spend/usage and explicit alert text", () => {
+    const html = dashboard(overview, sessions, projects, models, {
+      range: "7d",
+      compare: true,
+      kpis,
+      trends,
+      projectCostShare,
+      modelCostShare,
+      anomalies,
+      expensiveSessions: [],
+    });
+
+    expect(html).toContain('class="stat-card stat-card--spend"');
+    expect(html).toContain('class="stat-card stat-card--usage"');
+    expect(html).toContain('class="quick-section quick-section--alert"');
+    expect(html).toContain("HIGH alert");
+  });
 });
