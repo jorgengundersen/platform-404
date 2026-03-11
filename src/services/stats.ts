@@ -87,6 +87,13 @@ export interface TrendPoint {
   readonly tokensReasoning: number;
 }
 
+export interface CostShareItem {
+  readonly label: string;
+  readonly key: string;
+  readonly cost: number;
+  readonly sharePct: number;
+}
+
 export interface AnomalyItem {
   readonly type: "cost_spike" | "model_spike";
   readonly date: string;
@@ -121,6 +128,12 @@ export class StatsService extends Context.Tag("StatsService")<
     readonly getTrendSeries: (params: {
       range: DashboardRangeQueryParam;
     }) => Effect.Effect<TrendPoint[], StatsError>;
+    readonly getProjectCostShare: (params: {
+      range: DashboardRangeQueryParam;
+    }) => Effect.Effect<CostShareItem[], StatsError>;
+    readonly getModelCostShare: (params: {
+      range: DashboardRangeQueryParam;
+    }) => Effect.Effect<CostShareItem[], StatsError>;
     readonly getAnomalies: (params: {
       range: DashboardRangeQueryParam;
     }) => Effect.Effect<AnomalyItem[], StatsError>;
@@ -226,6 +239,18 @@ interface ExpensiveSessionRow {
   title: string | null;
   total_cost: number | null;
   date: string;
+}
+
+interface ProjectCostShareRow {
+  project_id: string;
+  project_name: string | null;
+  total_cost: number | null;
+}
+
+interface ModelCostShareRow {
+  provider_id: string | null;
+  model_id: string;
+  total_cost: number | null;
 }
 
 // ---------------------------------------------------------------------------
@@ -468,6 +493,115 @@ export const StatsServiceLive: Layer.Layer<StatsService, never, DashboardDb> =
         if (ratio >= 3) return "medium";
         return "low";
       };
+
+      const top5PlusOther = (
+        items: ReadonlyArray<{
+          label: string;
+          key: string;
+          cost: number;
+        }>,
+      ): CostShareItem[] => {
+        const totalCost = items.reduce((sum, item) => sum + item.cost, 0);
+        const toShare = (cost: number): number =>
+          totalCost <= 0 ? 0 : (cost / totalCost) * 100;
+
+        const top = items.slice(0, 5).map(
+          (item): CostShareItem => ({
+            label: item.label,
+            key: item.key,
+            cost: item.cost,
+            sharePct: toShare(item.cost),
+          }),
+        );
+
+        if (items.length <= 5) {
+          return top;
+        }
+
+        const otherCost = items
+          .slice(5)
+          .reduce((sum, item) => sum + item.cost, 0);
+
+        return [
+          ...top,
+          {
+            label: "Other",
+            key: "other",
+            cost: otherCost,
+            sharePct: toShare(otherCost),
+          },
+        ];
+      };
+
+      const getProjectCostShare = (params: {
+        range: DashboardRangeQueryParam;
+      }): Effect.Effect<CostShareItem[], StatsError> =>
+        Effect.try({
+          try: () => {
+            const { startMs, endMs } = getRangeBounds(params.range);
+            const rows = sqlite
+              .query<ProjectCostShareRow, [number, number]>(
+                `SELECT
+                   project_id,
+                   project_name,
+                   SUM(total_cost) AS total_cost
+                 FROM sessions
+                 WHERE time_updated >= ? AND time_updated <= ?
+                 GROUP BY project_id, project_name
+                 ORDER BY total_cost DESC, project_id ASC`,
+              )
+              .all(startMs, endMs);
+
+            return top5PlusOther(
+              rows.map((row) => ({
+                label: formatProjectName(row.project_name, row.project_id),
+                key: row.project_id,
+                cost: row.total_cost ?? 0,
+              })),
+            );
+          },
+          catch: (cause) =>
+            new StatsError({
+              reason: "Failed to get project cost share",
+              cause,
+            }),
+        });
+
+      const getModelCostShare = (params: {
+        range: DashboardRangeQueryParam;
+      }): Effect.Effect<CostShareItem[], StatsError> =>
+        Effect.try({
+          try: () => {
+            const { startMs, endMs } = getRangeBounds(params.range);
+            const rows = sqlite
+              .query<ModelCostShareRow, [number, number]>(
+                `SELECT
+                   provider_id,
+                   model_id,
+                   SUM(cost) AS total_cost
+                 FROM messages
+                 WHERE role = 'assistant'
+                   AND model_id IS NOT NULL
+                   AND time_created >= ? AND time_created <= ?
+                 GROUP BY provider_id, model_id
+                 ORDER BY total_cost DESC, model_id ASC, provider_id ASC`,
+              )
+              .all(startMs, endMs);
+
+            return top5PlusOther(
+              rows.map((row) => {
+                const provider = row.provider_id ?? "unknown";
+                return {
+                  label: row.model_id,
+                  key: `${provider}:${row.model_id}`,
+                  cost: row.total_cost ?? 0,
+                };
+              }),
+            );
+          },
+          catch: (cause) =>
+            new StatsError({ reason: "Failed to get model cost share", cause }),
+        });
 
       const getAnomalies = (params: {
         range: DashboardRangeQueryParam;
@@ -761,6 +895,8 @@ export const StatsServiceLive: Layer.Layer<StatsService, never, DashboardDb> =
         getDailyStats,
         getKpiSummary,
         getTrendSeries,
+        getProjectCostShare,
+        getModelCostShare,
         getAnomalies,
         getExpensiveSessions,
         getModelBreakdown,

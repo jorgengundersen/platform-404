@@ -552,3 +552,89 @@ describe("StatsService attention feeds", () => {
     }
   });
 });
+
+describe("StatsService cost share", () => {
+  test("returns top 5 plus Other for projects and models with deterministic tie ordering", async () => {
+    const originalNow = Date.now;
+    Date.now = () => Date.parse("2023-11-20T12:00:00.000Z");
+
+    try {
+      const program = Effect.gen(function* () {
+        const { sqlite } = yield* DashboardDb;
+
+        sqlite.exec(`
+          INSERT INTO sessions (id, project_id, project_name, title, version,
+            summary_additions, summary_deletions, summary_files,
+            message_count, total_cost, total_tokens_input, total_tokens_output,
+            total_tokens_reasoning, total_cache_read, total_cache_write,
+            time_created, time_updated, time_ingested)
+          VALUES
+            ('cs-p1', 'p1', 'Project 1', 'Session P1', '1.0', 0, 0, 0, 1, 50, 0, 0, 0, 0, 0, 1700395200000, 1700395200000, 1700395200000),
+            ('cs-p2', 'p2', 'Project 2', 'Session P2', '1.0', 0, 0, 0, 1, 40, 0, 0, 0, 0, 0, 1700395200000, 1700395200000, 1700395200000),
+            ('cs-p3', 'p3', 'Project 3', 'Session P3', '1.0', 0, 0, 0, 1, 30, 0, 0, 0, 0, 0, 1700395200000, 1700395200000, 1700395200000),
+            ('cs-p4', 'p4', 'Project 4', 'Session P4', '1.0', 0, 0, 0, 1, 20, 0, 0, 0, 0, 0, 1700395200000, 1700395200000, 1700395200000),
+            ('cs-p5', 'p5', 'Project 5', 'Session P5', '1.0', 0, 0, 0, 1, 20, 0, 0, 0, 0, 0, 1700395200000, 1700395200000, 1700395200000),
+            ('cs-p6', 'p6', 'Project 6', 'Session P6', '1.0', 0, 0, 0, 1, 10, 0, 0, 0, 0, 0, 1700395200000, 1700395200000, 1700395200000);
+
+          INSERT INTO messages (id, session_id, role, provider_id, model_id, agent,
+            cost, tokens_input, tokens_output, tokens_reasoning, cache_read, cache_write,
+            time_created, time_ingested)
+          VALUES
+            ('cs-m1', 'cs-p1', 'assistant', 'anthropic', 'm1', 'agent', 60, 0, 0, 0, 0, 0, 1700395200000, 1700395200000),
+            ('cs-m2', 'cs-p2', 'assistant', 'anthropic', 'm2', 'agent', 40, 0, 0, 0, 0, 0, 1700395200000, 1700395200000),
+            ('cs-m3', 'cs-p3', 'assistant', 'anthropic', 'm3', 'agent', 30, 0, 0, 0, 0, 0, 1700395200000, 1700395200000),
+            ('cs-m4', 'cs-p4', 'assistant', 'anthropic', 'm4', 'agent', 20, 0, 0, 0, 0, 0, 1700395200000, 1700395200000),
+            ('cs-m5', 'cs-p5', 'assistant', 'anthropic', 'm5', 'agent', 20, 0, 0, 0, 0, 0, 1700395200000, 1700395200000),
+            ('cs-m6', 'cs-p6', 'assistant', 'anthropic', 'm6', 'agent', 10, 0, 0, 0, 0, 0, 1700395200000, 1700395200000);
+        `);
+
+        const stats = yield* StatsService;
+        const projects = yield* stats.getProjectCostShare({ range: "7d" });
+        const models = yield* stats.getModelCostShare({ range: "7d" });
+
+        return { projects, models };
+      });
+
+      const result = await Effect.runPromise(
+        program.pipe(
+          Effect.provide(StatsServiceLive),
+          Effect.provide(DashboardDbTest),
+        ),
+      );
+
+      expect(result.projects.map((item) => item.key)).toEqual([
+        "p1",
+        "p2",
+        "p3",
+        "p4",
+        "p5",
+        "other",
+      ]);
+      expect(result.projects[5]?.cost).toBeCloseTo(10, 5);
+
+      expect(result.models.map((item) => item.key)).toEqual([
+        "anthropic:m1",
+        "anthropic:m2",
+        "anthropic:m3",
+        "anthropic:m4",
+        "anthropic:m5",
+        "other",
+      ]);
+      expect(result.models[5]?.cost).toBeCloseTo(10, 5);
+
+      const projectShareSum = result.projects.reduce(
+        (sum, item) => sum + item.sharePct,
+        0,
+      );
+      const modelShareSum = result.models.reduce(
+        (sum, item) => sum + item.sharePct,
+        0,
+      );
+
+      expect(projectShareSum).toBeCloseTo(100, 8);
+      expect(modelShareSum).toBeCloseTo(100, 8);
+    } finally {
+      Date.now = originalNow;
+    }
+  });
+});
