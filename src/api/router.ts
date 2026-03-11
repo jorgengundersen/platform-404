@@ -12,10 +12,15 @@ import {
   sessionsListHandler,
 } from "@/api/sessions";
 import {
+  statsAnomaliesHandler,
+  statsCostShareModelsHandler,
+  statsCostShareProjectsHandler,
   statsDailyHandler,
+  statsKpisHandler,
   statsModelsHandler,
   statsOverviewHandler,
   statsProjectsHandler,
+  statsTrendsHandler,
 } from "@/api/stats";
 import type { DashboardDb } from "@/services/dashboard-db";
 import type { StatsService } from "@/services/stats";
@@ -116,6 +121,17 @@ export function createRouter(): Effect.Effect<
     HttpRouter.get("/api/stats/daily", liftHandler(statsDailyHandler)),
     HttpRouter.get("/api/stats/models", liftHandler(statsModelsHandler)),
     HttpRouter.get("/api/stats/projects", liftHandler(statsProjectsHandler)),
+    HttpRouter.get("/api/stats/kpis", liftHandler(statsKpisHandler)),
+    HttpRouter.get("/api/stats/trends", liftHandler(statsTrendsHandler)),
+    HttpRouter.get(
+      "/api/stats/cost-share/projects",
+      liftHandler(statsCostShareProjectsHandler),
+    ),
+    HttpRouter.get(
+      "/api/stats/cost-share/models",
+      liftHandler(statsCostShareModelsHandler),
+    ),
+    HttpRouter.get("/api/stats/anomalies", liftHandler(statsAnomaliesHandler)),
     HttpRouter.get("/api/sessions", liftHandler(sessionsListHandler)),
     HttpRouter.get(
       "/api/daily/:date",

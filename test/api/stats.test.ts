@@ -3,10 +3,15 @@ import { describe, expect, test } from "bun:test";
 import { Effect, Layer } from "effect";
 
 import {
+  statsAnomaliesHandler,
+  statsCostShareModelsHandler,
+  statsCostShareProjectsHandler,
   statsDailyHandler,
+  statsKpisHandler,
   statsModelsHandler,
   statsOverviewHandler,
   statsProjectsHandler,
+  statsTrendsHandler,
 } from "@/api/stats";
 import { DashboardDb, DashboardDbTest } from "@/services/dashboard-db";
 import { StatsServiceLive } from "@/services/stats";
@@ -217,5 +222,94 @@ describe("GET /api/stats/projects", () => {
     const body = (await response.json()) as { data: { projects: unknown[] } };
     expect(Array.isArray(body.data.projects)).toBe(true);
     expect(body.data.projects).toHaveLength(1);
+  });
+});
+
+describe("dashboard v2 stats endpoints", () => {
+  test("return envelope data for valid params and 400 for invalid params", async () => {
+    const okResponses = await Promise.all([
+      Effect.runPromise(
+        statsKpisHandler(
+          new Request(
+            "http://localhost:3000/api/stats/kpis?range=7d&compare=1",
+          ),
+        ).pipe(Effect.provide(TestLayer)),
+      ),
+      Effect.runPromise(
+        statsTrendsHandler(
+          new Request("http://localhost:3000/api/stats/trends?range=30d"),
+        ).pipe(Effect.provide(TestLayer)),
+      ),
+      Effect.runPromise(
+        statsCostShareProjectsHandler(
+          new Request(
+            "http://localhost:3000/api/stats/cost-share/projects?range=90d",
+          ),
+        ).pipe(Effect.provide(TestLayer)),
+      ),
+      Effect.runPromise(
+        statsCostShareModelsHandler(
+          new Request(
+            "http://localhost:3000/api/stats/cost-share/models?range=7d",
+          ),
+        ).pipe(Effect.provide(TestLayer)),
+      ),
+      Effect.runPromise(
+        statsAnomaliesHandler(
+          new Request("http://localhost:3000/api/stats/anomalies?range=30d"),
+        ).pipe(Effect.provide(TestLayer)),
+      ),
+    ]);
+
+    for (const response of okResponses) {
+      expect(response.status).toBe(200);
+      const body = (await response.json()) as { data: unknown };
+      expect(body.data).toBeDefined();
+    }
+
+    const badResponses = await Promise.all([
+      Effect.runPromise(
+        statsKpisHandler(
+          new Request(
+            "http://localhost:3000/api/stats/kpis?range=oops&compare=1",
+          ),
+        ).pipe(Effect.provide(TestLayer)),
+      ),
+      Effect.runPromise(
+        statsKpisHandler(
+          new Request(
+            "http://localhost:3000/api/stats/kpis?range=7d&compare=2",
+          ),
+        ).pipe(Effect.provide(TestLayer)),
+      ),
+      Effect.runPromise(
+        statsTrendsHandler(
+          new Request("http://localhost:3000/api/stats/trends?range=oops"),
+        ).pipe(Effect.provide(TestLayer)),
+      ),
+      Effect.runPromise(
+        statsCostShareProjectsHandler(
+          new Request(
+            "http://localhost:3000/api/stats/cost-share/projects?range=oops",
+          ),
+        ).pipe(Effect.provide(TestLayer)),
+      ),
+      Effect.runPromise(
+        statsCostShareModelsHandler(
+          new Request(
+            "http://localhost:3000/api/stats/cost-share/models?range=oops",
+          ),
+        ).pipe(Effect.provide(TestLayer)),
+      ),
+      Effect.runPromise(
+        statsAnomaliesHandler(
+          new Request("http://localhost:3000/api/stats/anomalies?range=oops"),
+        ).pipe(Effect.provide(TestLayer)),
+      ),
+    ]);
+
+    for (const response of badResponses) {
+      expect(response.status).toBe(400);
+    }
   });
 });

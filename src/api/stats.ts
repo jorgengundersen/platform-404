@@ -1,7 +1,11 @@
 import { Schema } from "@effect/schema";
 import { Effect } from "effect";
 
-import { DateRangeParams } from "@/primitives/schemas/api-params";
+import {
+  DashboardCompareQueryParam,
+  DashboardRangeQueryParam,
+  DateRangeParams,
+} from "@/primitives/schemas/api-params";
 import { formatDate } from "@/primitives/time";
 import { type StatsError, StatsService } from "@/services/stats";
 
@@ -21,6 +25,28 @@ function jsonError(message: string, status = 400): Response {
     status,
     headers: { "Content-Type": "application/json" },
   });
+}
+
+function parseRange(
+  rawRange: string | null,
+): { range: "7d" | "30d" | "90d" } | null {
+  const rangeResult = Schema.decodeUnknownEither(DashboardRangeQueryParam)(
+    rawRange,
+  );
+  if (rangeResult._tag === "Left") {
+    return null;
+  }
+  return { range: rangeResult.right };
+}
+
+function parseCompare(rawCompare: string | null): { compare: boolean } | null {
+  const compareResult = Schema.decodeUnknownEither(DashboardCompareQueryParam)(
+    rawCompare,
+  );
+  if (compareResult._tag === "Left") {
+    return null;
+  }
+  return { compare: compareResult.right === "1" };
 }
 
 // ---------------------------------------------------------------------------
@@ -96,4 +122,85 @@ export const statsProjectsHandler = (
     const stats = yield* StatsService;
     const projects = yield* stats.getProjectBreakdown();
     return jsonOk({ projects });
+  });
+
+export const statsKpisHandler = (
+  req: Request,
+): Effect.Effect<Response, StatsError, StatsService> =>
+  Effect.gen(function* () {
+    const url = new URL(req.url);
+    const parsedRange = parseRange(url.searchParams.get("range"));
+    const parsedCompare = parseCompare(url.searchParams.get("compare"));
+    if (parsedRange === null || parsedCompare === null) {
+      return jsonError("Invalid range or compare query param");
+    }
+
+    const stats = yield* StatsService;
+    const kpis = yield* stats.getKpiSummary({
+      range: parsedRange.range,
+      compare: parsedCompare.compare,
+    });
+    return jsonOk({ kpis });
+  });
+
+export const statsTrendsHandler = (
+  req: Request,
+): Effect.Effect<Response, StatsError, StatsService> =>
+  Effect.gen(function* () {
+    const url = new URL(req.url);
+    const parsedRange = parseRange(url.searchParams.get("range"));
+    if (parsedRange === null) {
+      return jsonError("Invalid range query param");
+    }
+
+    const stats = yield* StatsService;
+    const trends = yield* stats.getTrendSeries({ range: parsedRange.range });
+    return jsonOk({ trends });
+  });
+
+export const statsCostShareProjectsHandler = (
+  req: Request,
+): Effect.Effect<Response, StatsError, StatsService> =>
+  Effect.gen(function* () {
+    const url = new URL(req.url);
+    const parsedRange = parseRange(url.searchParams.get("range"));
+    if (parsedRange === null) {
+      return jsonError("Invalid range query param");
+    }
+
+    const stats = yield* StatsService;
+    const projects = yield* stats.getProjectCostShare({
+      range: parsedRange.range,
+    });
+    return jsonOk({ projects });
+  });
+
+export const statsCostShareModelsHandler = (
+  req: Request,
+): Effect.Effect<Response, StatsError, StatsService> =>
+  Effect.gen(function* () {
+    const url = new URL(req.url);
+    const parsedRange = parseRange(url.searchParams.get("range"));
+    if (parsedRange === null) {
+      return jsonError("Invalid range query param");
+    }
+
+    const stats = yield* StatsService;
+    const models = yield* stats.getModelCostShare({ range: parsedRange.range });
+    return jsonOk({ models });
+  });
+
+export const statsAnomaliesHandler = (
+  req: Request,
+): Effect.Effect<Response, StatsError, StatsService> =>
+  Effect.gen(function* () {
+    const url = new URL(req.url);
+    const parsedRange = parseRange(url.searchParams.get("range"));
+    if (parsedRange === null) {
+      return jsonError("Invalid range query param");
+    }
+
+    const stats = yield* StatsService;
+    const anomalies = yield* stats.getAnomalies({ range: parsedRange.range });
+    return jsonOk({ anomalies });
   });
