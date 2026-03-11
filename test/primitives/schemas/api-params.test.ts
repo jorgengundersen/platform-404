@@ -2,6 +2,7 @@ import { describe, expect, it } from "bun:test";
 import { Schema } from "@effect/schema";
 import {
   DateRangeParams,
+  decodeDashboardRootQueryParams,
   SessionsListParams,
 } from "@/primitives/schemas/api-params";
 
@@ -57,5 +58,28 @@ describe("SessionsListParams", () => {
     expect(() =>
       Schema.decodeUnknownSync(SessionsListParams)({ page: 1, limit: 101 }),
     ).toThrow();
+  });
+});
+
+describe("decodeDashboardRootQueryParams", () => {
+  it("applies defaults for empty and invalid range/compare", () => {
+    expect(decodeDashboardRootQueryParams({})).toEqual({
+      range: "30d",
+      compare: "1",
+    });
+
+    expect(
+      decodeDashboardRootQueryParams({ range: "garbage", compare: "-1" }),
+    ).toEqual({
+      range: "30d",
+      compare: "1",
+    });
+
+    expect(
+      decodeDashboardRootQueryParams({ range: "7d", compare: "0" }),
+    ).toEqual({
+      range: "7d",
+      compare: "0",
+    });
   });
 });

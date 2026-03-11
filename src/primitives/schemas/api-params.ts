@@ -1,4 +1,5 @@
 import { Schema } from "@effect/schema";
+import { Option } from "effect";
 
 const DATE_RE = /^\d{4}-\d{2}-\d{2}$/;
 
@@ -53,3 +54,37 @@ export const SessionsListQueryParams = Schema.Struct({
 });
 
 export type SessionsListQueryParams = typeof SessionsListQueryParams.Type;
+
+export const DashboardRangeQueryParam = Schema.Literal("7d", "30d", "90d");
+export type DashboardRangeQueryParam = typeof DashboardRangeQueryParam.Type;
+
+export const DashboardCompareQueryParam = Schema.Literal("0", "1");
+export type DashboardCompareQueryParam = typeof DashboardCompareQueryParam.Type;
+
+export interface DashboardRootQueryParams {
+  range: DashboardRangeQueryParam;
+  compare: DashboardCompareQueryParam;
+}
+
+const decodeDashboardRangeQueryParam = Schema.decodeUnknownOption(
+  DashboardRangeQueryParam,
+);
+const decodeDashboardCompareQueryParam = Schema.decodeUnknownOption(
+  DashboardCompareQueryParam,
+);
+
+export function decodeDashboardRootQueryParams(raw: {
+  range?: string;
+  compare?: string;
+}): DashboardRootQueryParams {
+  const range: DashboardRangeQueryParam = Option.getOrElse(
+    decodeDashboardRangeQueryParam(raw.range),
+    () => "30d" as const,
+  );
+  const compare: DashboardCompareQueryParam = Option.getOrElse(
+    decodeDashboardCompareQueryParam(raw.compare),
+    () => "1" as const,
+  );
+
+  return { range, compare };
+}
