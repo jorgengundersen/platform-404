@@ -12,11 +12,14 @@ set -euo pipefail
 # ---------------------------------------------------------------------------
 # Defaults (adjust these)
 # ---------------------------------------------------------------------------
-DEFAULT_MODEL="github-copilot/claude-sonnet-4.6"
-DEFAULT_PROMPT=".ralph/PROMPT.md"
+DEFAULT_MODEL="github-copilot/gpt-5.3-codex"
+DEFAULT_PROMPT=".ralph/DEFAULT_PROMPT.md"
 DEFAULT_MAX_ITERATIONS=10
-DEFAULT_DONE_FILE=".ralph/DONE"
-DEFAULT_LOG_DIR=".ralph/logs"
+DEFAULT_DONE_FILE=".ralph/general.DONE"
+DEFAULT_LOG_DIR=".ralph/logs/general"
+DEFAULT_SLEEP_INTERVAL=60
+DEFAULT_MAX_IDLE="100"
+LOOP_TYPE="general"
 
 # ---------------------------------------------------------------------------
 # Resolve paths
@@ -32,10 +35,13 @@ usage() {
 usage: ralph-loop [options]
 
 options:
-  -m, --model <model>       model to use (default: $DEFAULT_MODEL)
-  -p, --prompt <file>       prompt file, relative to project root (default: $DEFAULT_PROMPT)
-  -n, --max-iterations <n>  max loop iterations (default: $DEFAULT_MAX_ITERATIONS)
-  -h, --help                show this help
+  -m, --model <model>           model to use (default: $DEFAULT_MODEL)
+  -p, --prompt <file>           prompt file, relative to project root (default: $DEFAULT_PROMPT)
+  -n, --max-iterations <n>      max loop iterations (default: $DEFAULT_MAX_ITERATIONS; ignored in daemon mode)
+  -d, --daemon                  daemon mode: sleep when idle instead of exiting
+      --sleep-interval <secs>   idle sleep duration in seconds (default: $DEFAULT_SLEEP_INTERVAL; daemon mode only)
+      --max-idle <n>            max consecutive idle sleep cycles before exit (default: 100; daemon mode only)
+  -h, --help                    show this help
 EOF
   exit 0
 }
@@ -48,12 +54,18 @@ PROMPT_REL="$DEFAULT_PROMPT"
 MAX_ITERATIONS="$DEFAULT_MAX_ITERATIONS"
 DONE_FILE="$PROJECT_DIR/$DEFAULT_DONE_FILE"
 LOG_DIR="$PROJECT_DIR/$DEFAULT_LOG_DIR"
+DAEMON_MODE=false
+SLEEP_INTERVAL="$DEFAULT_SLEEP_INTERVAL"
+MAX_IDLE="$DEFAULT_MAX_IDLE"
 
 while [[ $# -gt 0 ]]; do
   case "$1" in
     -m|--model)          MODEL="$2"; shift 2 ;;
     -p|--prompt)         PROMPT_REL="$2"; shift 2 ;;
     -n|--max-iterations) MAX_ITERATIONS="$2"; shift 2 ;;
+    -d|--daemon)         DAEMON_MODE=true; shift ;;
+    --sleep-interval)    SLEEP_INTERVAL="$2"; shift 2 ;;
+    --max-idle)          MAX_IDLE="$2"; shift 2 ;;
     -h|--help)           usage ;;
     *) echo "error: unknown option: $1" >&2; usage ;;
   esac
@@ -66,7 +78,7 @@ PROMPT_FILE="$PROJECT_DIR/$PROMPT_REL"
 # ---------------------------------------------------------------------------
 RUN_TS="$(date '+%Y%m%dT%H%M%S')"
 mkdir -p "$LOG_DIR"
-LOG_FILE="$LOG_DIR/${RUN_TS}.log"
+LOG_FILE="$LOG_DIR/${RUN_TS}_${LOOP_TYPE}_pid$$.log"
 : > "$LOG_FILE"
 ln -sf "$LOG_FILE" "$LOG_DIR/latest"
 
@@ -75,6 +87,14 @@ log() {
   local ts
   ts="$(date '+%Y-%m-%dT%H:%M:%S%z')"
   printf '%s [%s] %s\n' "$ts" "$level" "$*" | tee -a "$LOG_FILE"
+}
+
+# ---------------------------------------------------------------------------
+# Helpers
+# ---------------------------------------------------------------------------
+# Keep only issues labeled 'ok' (case-insensitive).
+BD_READY_FILTERED() {
+  bd ready --json 2>/dev/null | jq '[.[] | select(any((.labels // [])[]; ascii_downcase == "ok"))]'
 }
 
 # ---------------------------------------------------------------------------
@@ -100,6 +120,28 @@ if ! [[ "$MAX_ITERATIONS" =~ ^[0-9]+$ ]] || [[ "$MAX_ITERATIONS" -lt 1 ]]; then
   exit 1
 fi
 
+if ! [[ "$SLEEP_INTERVAL" =~ ^[0-9]+$ ]] || [[ "$SLEEP_INTERVAL" -lt 1 ]]; then
+  log ERROR "sleep-interval must be a positive integer: $SLEEP_INTERVAL"
+  exit 1
+fi
+
+if [[ -n "$MAX_IDLE" ]]; then
+  if ! [[ "$MAX_IDLE" =~ ^[0-9]+$ ]] || [[ "$MAX_IDLE" -lt 1 ]]; then
+    log ERROR "max-idle must be a positive integer: $MAX_IDLE"
+    exit 1
+  fi
+fi
+
+# ---------------------------------------------------------------------------
+# Git remote check
+# ---------------------------------------------------------------------------
+ORIGIN_URL="$(git -C "$PROJECT_DIR" remote get-url origin 2>/dev/null || true)"
+if [[ -n "$ORIGIN_URL" ]]; then
+  log INFO "event=git_remote_detected origin=$ORIGIN_URL"
+else
+  log WARN "event=git_remote_missing msg=origin remote not configured"
+fi
+
 # ---------------------------------------------------------------------------
 # Reset done file
 # ---------------------------------------------------------------------------
@@ -114,7 +156,7 @@ check_done_file() {
 
 check_no_ready_work() {
   local ready
-  ready="$(bd ready --json 2>/dev/null)"
+  ready="$(BD_READY_FILTERED)"
   [[ "$ready" == "[]" || "$ready" == "" ]]
 }
 
@@ -123,12 +165,18 @@ check_no_ready_work() {
 # ---------------------------------------------------------------------------
 RUN_START=$(date +%s)
 
-log INFO "event=start project=$PROJECT_DIR model=$MODEL prompt=$PROMPT_REL max=$MAX_ITERATIONS log=$LOG_FILE"
+log INFO "event=start loop_type=$LOOP_TYPE project=$PROJECT_DIR model=$MODEL prompt=$PROMPT_REL done_file=$DONE_FILE log_dir=$LOG_DIR max=$MAX_ITERATIONS daemon=$DAEMON_MODE sleep_interval=$SLEEP_INTERVAL max_idle=$MAX_IDLE log=$LOG_FILE ready_filter=exclude_experiment"
 
 SESSIONS_RUN=0
+IDLE_CYCLES=0
 EXIT_REASON=""
 
-for ((LOOP_COUNT=1; LOOP_COUNT<=MAX_ITERATIONS; LOOP_COUNT++)); do
+# In daemon mode we loop indefinitely (until DONE or max_idle); otherwise cap at MAX_ITERATIONS.
+# We use a while-true and break manually so daemon mode can ignore MAX_ITERATIONS.
+LOOP_COUNT=0
+
+while true; do
+  LOOP_COUNT=$((LOOP_COUNT + 1))
 
   # --- guard: done file ---
   if check_done_file; then
@@ -137,15 +185,43 @@ for ((LOOP_COUNT=1; LOOP_COUNT<=MAX_ITERATIONS; LOOP_COUNT++)); do
     break
   fi
 
-  # --- guard: no ready work in beads ---
+  # --- guard: no ready work ---
   if check_no_ready_work; then
-    log INFO "event=no_ready_work loop=$LOOP_COUNT msg=no ready issues in beads"
-    EXIT_REASON="no_ready_work"
+    if $DAEMON_MODE; then
+      IDLE_CYCLES=$((IDLE_CYCLES + 1))
+      log INFO "event=daemon_sleep loop=$LOOP_COUNT idle_cycle=$IDLE_CYCLES sleep=${SLEEP_INTERVAL}s max_idle=$MAX_IDLE"
+      # Check max_idle threshold
+      if [[ -n "$MAX_IDLE" ]] && [[ "$IDLE_CYCLES" -ge "$MAX_IDLE" ]]; then
+        log INFO "event=max_idle loop=$LOOP_COUNT idle_cycles=$IDLE_CYCLES msg=max idle cycles reached"
+        EXIT_REASON="max_idle"
+        break
+      fi
+      sleep "$SLEEP_INTERVAL"
+      log INFO "event=daemon_wake loop=$LOOP_COUNT idle_cycle=$IDLE_CYCLES"
+      continue
+    else
+      log INFO "event=no_ready_work loop=$LOOP_COUNT msg=no ready issues in beads"
+      EXIT_REASON="no_ready_work"
+      break
+    fi
+  fi
+
+  # Work is available — reset idle counter
+  IDLE_CYCLES=0
+
+  # --- guard: max iterations (normal mode only) ---
+  if ! $DAEMON_MODE && [[ "$LOOP_COUNT" -gt "$MAX_ITERATIONS" ]]; then
+    log WARN "event=max_iterations max=$MAX_ITERATIONS msg=max iterations reached"
+    EXIT_REASON="max"
     break
   fi
 
-  READY_COUNT="$(bd ready --json 2>/dev/null | python3 -c 'import sys,json; print(len(json.load(sys.stdin)))' 2>/dev/null || echo '?')"
-  log INFO "event=session_start loop=$LOOP_COUNT/$MAX_ITERATIONS ready=$READY_COUNT"
+  READY_COUNT="$(BD_READY_FILTERED | jq 'length' 2>/dev/null || echo '?')"
+  if $DAEMON_MODE; then
+    log INFO "event=session_start loop=$LOOP_COUNT ready=$READY_COUNT"
+  else
+    log INFO "event=session_start loop=$LOOP_COUNT/$MAX_ITERATIONS ready=$READY_COUNT"
+  fi
 
   ITER_START=$(date +%s)
   PROMPT=$(cat "$PROMPT_FILE")
@@ -155,7 +231,11 @@ for ((LOOP_COUNT=1; LOOP_COUNT<=MAX_ITERATIONS; LOOP_COUNT++)); do
   set -e
   ITER_END=$(date +%s)
 
-  log INFO "event=session_end loop=$LOOP_COUNT/$MAX_ITERATIONS exit_code=$SESSION_EXIT duration=$((ITER_END - ITER_START))s"
+  if $DAEMON_MODE; then
+    log INFO "event=session_end loop=$LOOP_COUNT exit_code=$SESSION_EXIT duration=$((ITER_END - ITER_START))s"
+  else
+    log INFO "event=session_end loop=$LOOP_COUNT/$MAX_ITERATIONS exit_code=$SESSION_EXIT duration=$((ITER_END - ITER_START))s"
+  fi
 
   SESSIONS_RUN=$((SESSIONS_RUN + 1))
 
@@ -165,13 +245,15 @@ for ((LOOP_COUNT=1; LOOP_COUNT<=MAX_ITERATIONS; LOOP_COUNT++)); do
     EXIT_REASON="done"
     break
   fi
+
+  # --- max iterations guard (normal mode, post-session) ---
+  if ! $DAEMON_MODE && [[ "$SESSIONS_RUN" -ge "$MAX_ITERATIONS" ]]; then
+    log WARN "event=max_iterations max=$MAX_ITERATIONS msg=max iterations reached"
+    EXIT_REASON="max"
+    break
+  fi
 done
 
-if [[ -z "$EXIT_REASON" ]] && [[ "$SESSIONS_RUN" -ge "$MAX_ITERATIONS" ]]; then
-  log WARN "event=max_iterations max=$MAX_ITERATIONS msg=max iterations reached"
-  EXIT_REASON="max"
-fi
-
-REMAINING_READY="$(bd ready --json 2>/dev/null | python3 -c 'import sys,json; print(len(json.load(sys.stdin)))' 2>/dev/null || echo '?')"
+REMAINING_READY="$(BD_READY_FILTERED | jq 'length' 2>/dev/null || echo '?')"
 RUN_END=$(date +%s)
 log INFO "event=finish sessions=$SESSIONS_RUN exit_reason=$EXIT_REASON remaining_ready=$REMAINING_READY total_duration=$((RUN_END - RUN_START))s"
