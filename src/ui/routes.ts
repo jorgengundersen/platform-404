@@ -3,6 +3,7 @@ import { join } from "node:path";
 
 import { Effect } from "effect";
 
+import { decodeDashboardRootQueryParams } from "@/primitives/schemas/api-params";
 import { DashboardDb } from "@/services/dashboard-db";
 import { StatsService } from "@/services/stats";
 import { dailyDetailPage } from "@/ui/templates/daily-detail";
@@ -43,13 +44,29 @@ interface MessageRow {
 }
 
 export const rootHandler = (
-  _req: Request,
+  req: Request,
 ): Effect.Effect<Response, never, StatsService | DashboardDb> =>
   Effect.gen(function* () {
+    const url = new URL(req.url);
+    const { range, compare } = decodeDashboardRootQueryParams({
+      range: url.searchParams.get("range") ?? undefined,
+      compare: url.searchParams.get("compare") ?? undefined,
+    });
+
     const stats = yield* StatsService;
     const { sqlite } = yield* DashboardDb;
 
-    const [overview, projects, models] = yield* Effect.all(
+    const [
+      overview,
+      projects,
+      models,
+      kpis,
+      trends,
+      projectCostShare,
+      modelCostShare,
+      anomalies,
+      expensiveSessions,
+    ] = yield* Effect.all(
       [
         stats.getOverview().pipe(Effect.catchAll(() => Effect.succeed(null))),
         stats
@@ -57,6 +74,24 @@ export const rootHandler = (
           .pipe(Effect.catchAll(() => Effect.succeed([]))),
         stats
           .getModelBreakdown()
+          .pipe(Effect.catchAll(() => Effect.succeed([]))),
+        stats
+          .getKpiSummary({ range, compare: compare === "1" })
+          .pipe(Effect.catchAll(() => Effect.succeed(null))),
+        stats
+          .getTrendSeries({ range })
+          .pipe(Effect.catchAll(() => Effect.succeed([]))),
+        stats
+          .getProjectCostShare({ range })
+          .pipe(Effect.catchAll(() => Effect.succeed([]))),
+        stats
+          .getModelCostShare({ range })
+          .pipe(Effect.catchAll(() => Effect.succeed([]))),
+        stats
+          .getAnomalies({ range })
+          .pipe(Effect.catchAll(() => Effect.succeed([]))),
+        stats
+          .getExpensiveSessions({ range })
           .pipe(Effect.catchAll(() => Effect.succeed([]))),
       ],
       { concurrency: "unbounded" },
@@ -105,7 +140,16 @@ export const rootHandler = (
 
     const html = page(
       "platform-404",
-      dashboard(overview ?? emptyOverview, sessions, projects, models),
+      dashboard(overview ?? emptyOverview, sessions, projects, models, {
+        range,
+        compare: compare === "1",
+        kpis,
+        trends,
+        projectCostShare,
+        modelCostShare,
+        anomalies,
+        expensiveSessions,
+      }),
       "/",
     );
 

@@ -1,6 +1,27 @@
+import type { DashboardRangeQueryParam } from "@/primitives/schemas/api-params";
 import type { SessionSummary } from "@/primitives/schemas/session-summary";
-import type { ModelStat, Overview, ProjectStat } from "@/services/stats";
+import type {
+  AnomalyItem,
+  CostShareItem,
+  ExpensiveSessionItem,
+  KpiSummary,
+  ModelStat,
+  Overview,
+  ProjectStat,
+  TrendPoint,
+} from "@/services/stats";
 import { escapeHtml } from "@/ui/templates/page";
+
+interface DashboardV2Data {
+  readonly range: DashboardRangeQueryParam;
+  readonly compare: boolean;
+  readonly kpis: KpiSummary | null;
+  readonly trends: readonly TrendPoint[];
+  readonly projectCostShare: readonly CostShareItem[];
+  readonly modelCostShare: readonly CostShareItem[];
+  readonly anomalies: readonly AnomalyItem[];
+  readonly expensiveSessions: readonly ExpensiveSessionItem[];
+}
 
 function formatCost(cost: number): string {
   return `$${cost.toFixed(4)}`;
@@ -149,12 +170,18 @@ export function dashboard(
   sessions: readonly SessionSummary[],
   projects: readonly ProjectStat[],
   models: readonly ModelStat[],
+  v2Data?: DashboardV2Data,
 ): string {
+  const v2Payload = v2Data
+    ? `<script id="dashboard-v2-data" type="application/json">${escapeHtml(JSON.stringify(v2Data))}</script>`
+    : "";
+
   return `<main class="dashboard">
   <header class="dashboard-header">
     <h1>platform-404</h1>
   </header>
   ${overviewCards(stats)}
+  ${v2Payload}
   ${recentSessionsSection(sessions)}
   ${topProjectsSection(projects)}
   ${topModelsSection(models)}
