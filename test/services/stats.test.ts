@@ -437,3 +437,42 @@ describe("StatsService.getKpiSummary", () => {
     expect(result.compareOff.outputInputRatio.deltaPct).toBeNull();
   });
 });
+
+describe("StatsService.getTrendSeries", () => {
+  test("returns complete ordered daily points for range with zero-filled gaps", async () => {
+    const originalNow = Date.now;
+    Date.now = () => Date.parse("2023-11-20T12:00:00.000Z");
+
+    try {
+      const program = Effect.gen(function* () {
+        const { sqlite } = yield* DashboardDb;
+        seedDailyStats(sqlite);
+
+        const stats = yield* StatsService;
+        return yield* stats.getTrendSeries({ range: "7d" });
+      });
+
+      const result = await Effect.runPromise(
+        program.pipe(
+          Effect.provide(StatsServiceLive),
+          Effect.provide(DashboardDbTest),
+        ),
+      );
+
+      expect(result).toHaveLength(7);
+      expect(result[0]?.date).toBe("2023-11-14");
+      expect(result[6]?.date).toBe("2023-11-20");
+
+      expect(result[0]?.cost).toBeCloseTo(0.05, 5);
+      expect(result[0]?.sessions).toBe(1);
+      expect(result[2]?.date).toBe("2023-11-16");
+      expect(result[2]?.cost).toBe(0);
+      expect(result[2]?.sessions).toBe(0);
+      expect(result[2]?.tokensInput).toBe(0);
+      expect(result[2]?.tokensOutput).toBe(0);
+      expect(result[2]?.tokensReasoning).toBe(0);
+    } finally {
+      Date.now = originalNow;
+    }
+  });
+});

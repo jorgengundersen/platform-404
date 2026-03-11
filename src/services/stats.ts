@@ -2,6 +2,7 @@ import { Context, Data, Effect, Layer } from "effect";
 import { formatProjectName } from "@/primitives/project";
 import type { DashboardRangeQueryParam } from "@/primitives/schemas/api-params";
 import type { SessionSummary } from "@/primitives/schemas/session-summary";
+import { dateRangeDays, formatDate } from "@/primitives/time";
 import { DashboardDb } from "@/services/dashboard-db";
 
 // ---------------------------------------------------------------------------
@@ -77,6 +78,15 @@ export interface KpiSummary {
   readonly outputInputRatio: KpiValue;
 }
 
+export interface TrendPoint {
+  readonly date: string;
+  readonly cost: number;
+  readonly sessions: number;
+  readonly tokensInput: number;
+  readonly tokensOutput: number;
+  readonly tokensReasoning: number;
+}
+
 // ---------------------------------------------------------------------------
 // Service interface
 // ---------------------------------------------------------------------------
@@ -92,6 +102,9 @@ export class StatsService extends Context.Tag("StatsService")<
       range: DashboardRangeQueryParam;
       compare: boolean;
     }) => Effect.Effect<KpiSummary, StatsError>;
+    readonly getTrendSeries: (params: {
+      range: DashboardRangeQueryParam;
+    }) => Effect.Effect<TrendPoint[], StatsError>;
     readonly getModelBreakdown: () => Effect.Effect<ModelStat[], StatsError>;
     readonly getProjectBreakdown: () => Effect.Effect<
       ProjectStat[],
@@ -360,6 +373,45 @@ export const StatsServiceLive: Layer.Layer<StatsService, never, DashboardDb> =
             new StatsError({ reason: "Failed to get KPI summary", cause }),
         });
 
+      const getTrendSeries = (params: {
+        range: DashboardRangeQueryParam;
+      }): Effect.Effect<TrendPoint[], StatsError> =>
+        Effect.try({
+          try: () => {
+            const dayMs = 24 * 60 * 60 * 1000;
+            const rangeDays = getRangeDays(params.range);
+            const now = Date.now();
+            const end = formatDate(now);
+            const start = formatDate(now - (rangeDays - 1) * dayMs);
+
+            const rows = sqlite
+              .query<DailyStatRow, [string, string]>(
+                `SELECT date, session_count, message_count, total_cost,
+                  total_tokens_input, total_tokens_output, total_tokens_reasoning,
+                  total_cache_read, total_cache_write
+                FROM daily_stats
+                WHERE date >= ? AND date <= ?
+                ORDER BY date ASC`,
+              )
+              .all(start, end);
+
+            const byDate = new Map(rows.map((row) => [row.date, row]));
+            return dateRangeDays(start, end).map((date): TrendPoint => {
+              const row = byDate.get(date);
+              return {
+                date,
+                cost: row?.total_cost ?? 0,
+                sessions: row?.session_count ?? 0,
+                tokensInput: row?.total_tokens_input ?? 0,
+                tokensOutput: row?.total_tokens_output ?? 0,
+                tokensReasoning: row?.total_tokens_reasoning ?? 0,
+              };
+            });
+          },
+          catch: (cause) =>
+            new StatsError({ reason: "Failed to get trend series", cause }),
+        });
+
       const getModelBreakdown = (): Effect.Effect<ModelStat[], StatsError> =>
         Effect.try({
           try: () => {
@@ -529,6 +581,7 @@ export const StatsServiceLive: Layer.Layer<StatsService, never, DashboardDb> =
         getOverview,
         getDailyStats,
         getKpiSummary,
+        getTrendSeries,
         getModelBreakdown,
         getProjectBreakdown,
         getSessionsForDate,
