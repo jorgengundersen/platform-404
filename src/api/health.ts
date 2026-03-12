@@ -2,8 +2,14 @@ import { Effect } from "effect";
 
 import { DashboardDb, type DashboardDbError } from "@/services/dashboard-db";
 
+type CursorRow = {
+  source: string;
+  last_time_updated: number;
+  last_synced_at: number;
+};
+
 /**
- * healthHandler - Returns health status with last sync timestamp.
+ * healthHandler - Returns health status with per-source sync status.
  * Requires DashboardDb in context.
  */
 export const healthHandler = (
@@ -12,17 +18,28 @@ export const healthHandler = (
   Effect.gen(function* () {
     const { sqlite } = yield* DashboardDb;
 
-    const cursor = sqlite
-      .query("SELECT last_synced_at FROM ingestion_cursor WHERE source = ?")
-      .get("opencode:session") as { last_synced_at: number } | null;
+    const rows = sqlite
+      .query(
+        "SELECT source, last_time_updated, last_synced_at FROM ingestion_cursor",
+      )
+      .all() as CursorRow[];
 
-    const lastSync = cursor?.last_synced_at ?? null;
+    const sources: Record<
+      string,
+      { lastUpdated: number; lastSyncedAt: number }
+    > = {};
+    for (const row of rows) {
+      sources[row.source] = {
+        lastUpdated: row.last_time_updated,
+        lastSyncedAt: row.last_synced_at,
+      };
+    }
 
     return new Response(
       JSON.stringify({
         data: {
           status: "ok",
-          lastSync,
+          sources,
         },
       }),
       {
