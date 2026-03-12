@@ -253,6 +253,17 @@ export async function staticStylesHandler(_req: Request): Promise<Response> {
   });
 }
 
+export async function staticFaviconHandler(_req: Request): Promise<Response> {
+  const faviconPath = join(import.meta.dir, "static", "favicon.svg");
+  const favicon = readFileSync(faviconPath, "utf-8");
+  return new Response(favicon, {
+    status: 200,
+    headers: {
+      "Content-Type": "image/svg+xml",
+    },
+  });
+}
+
 export const modelsPageHandler = (
   _req: Request,
 ): Effect.Effect<Response, never, StatsService> =>

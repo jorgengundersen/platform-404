@@ -32,6 +32,7 @@ import {
   rootHandler,
   sessionPageHandler,
   sessionsListPageHandler,
+  staticFaviconHandler,
   staticStylesHandler,
 } from "@/ui/routes";
 
@@ -115,7 +116,7 @@ export function createRouter(): Effect.Effect<
   never,
   DashboardDb | StatsService | HttpServerRequest.HttpServerRequest
 > {
-  const router = HttpRouter.empty.pipe(
+  const apiRouter = HttpRouter.empty.pipe(
     HttpRouter.get("/api/health", liftHandler(healthHandler)),
     HttpRouter.get("/api/stats/overview", liftHandler(statsOverviewHandler)),
     HttpRouter.get("/api/stats/daily", liftHandler(statsDailyHandler)),
@@ -161,6 +162,10 @@ export function createRouter(): Effect.Effect<
         return HttpServerResponse.raw(response);
       }),
     ),
+  );
+
+  const router = apiRouter.pipe(
+    HttpRouter.get("/favicon.ico", liftAsyncHandler(staticFaviconHandler)),
     HttpRouter.get("/static/styles.css", liftAsyncHandler(staticStylesHandler)),
     HttpRouter.get("/models", liftHandler(modelsPageHandler)),
     HttpRouter.get("/projects", liftHandler(projectsPageHandler)),

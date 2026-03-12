@@ -124,4 +124,28 @@ describe("createRouter", () => {
     expect(result.missing.contentType).toContain("text/html");
     expect(result.missing.text).toContain("Page not found");
   });
+
+  test("GET /favicon.ico returns 200 with an image content type", async () => {
+    const AppLayer = makeAppLayer();
+
+    const program = Effect.gen(function* () {
+      const client = yield* HttpClient.HttpClient;
+      const response = yield* client.execute(
+        HttpClientRequest.get("/favicon.ico"),
+      );
+      return {
+        status: response.status,
+        contentType: response.headers["content-type"],
+        body: yield* response.text,
+      };
+    });
+
+    const result = await Effect.runPromise(
+      program.pipe(Effect.provide(AppLayer)),
+    );
+
+    expect(result.status).toBe(200);
+    expect(result.contentType).toContain("image/svg+xml");
+    expect(result.body).toContain("<svg");
+  });
 });
