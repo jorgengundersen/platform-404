@@ -12,7 +12,7 @@ set -euo pipefail
 # ---------------------------------------------------------------------------
 # Defaults (adjust these)
 # ---------------------------------------------------------------------------
-DEFAULT_MODEL="github-copilot/gpt-5.3-codex"
+DEFAULT_MODEL="opencode/gpt-5.3-codex"
 DEFAULT_PROMPT=".ralph/DEFAULT_PROMPT.md"
 DEFAULT_MAX_ITERATIONS=10
 DEFAULT_DONE_FILE=".ralph/general.DONE"
