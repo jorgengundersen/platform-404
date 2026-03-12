@@ -4,6 +4,7 @@ import { OpenCodeAdapter } from "@/adapters/opencode/adapter";
 import type { NormalizedBatch } from "@/primitives/schemas/normalized-batch";
 import { bucketByDay } from "@/primitives/time";
 import { DashboardDb } from "@/services/dashboard-db";
+import type { SourceAdapter } from "@/services/source-adapter";
 
 export class IngestionError extends Data.TaggedError("IngestionError")<{
   readonly reason: string;
@@ -189,6 +190,60 @@ function writeBatch(
   });
 }
 
+// Shared core: run all adapters sequentially, catch errors per adapter.
+function buildIngestOnce(
+  adapters: SourceAdapter[],
+  sqlite: Database,
+): Effect.Effect<void, IngestionError> {
+  return Effect.forEach(
+    adapters,
+    (adapter) =>
+      Effect.gen(function* () {
+        const batch = yield* adapter.fetchBatch;
+        if (batch === null) return;
+        yield* writeBatch(sqlite, batch);
+      }).pipe(
+        Effect.mapError(
+          (cause) =>
+            new IngestionError({
+              reason: `Failed to ingest from ${adapter.source}`,
+              cause,
+            }),
+        ),
+        Effect.catchAll((e) =>
+          Effect.sync(() => {
+            console.error(`[ingestion:${adapter.source}] error:`, e.reason);
+          }),
+        ),
+      ),
+    { concurrency: 1 },
+  ).pipe(Effect.map(() => undefined));
+}
+
+/**
+ * makeIngestionServiceLive - factory for multi-adapter ingestion.
+ *
+ * Accepts a list of SourceAdapters as plain values (not Effect context).
+ * Each adapter is called sequentially on every ingestOnce tick.
+ * Adapter errors are caught per-adapter and do not stop other adapters.
+ */
+export function makeIngestionServiceLive(
+  adapters: SourceAdapter[],
+): Layer.Layer<IngestionService, never, DashboardDb> {
+  return Layer.effect(
+    IngestionService,
+    Effect.gen(function* () {
+      const { sqlite } = yield* DashboardDb;
+      return { ingestOnce: buildIngestOnce(adapters, sqlite) };
+    }),
+  );
+}
+
+/**
+ * IngestionServiceLive - single OpenCode adapter ingestion layer.
+ *
+ * Resolves OpenCodeAdapter from Effect context and delegates to buildIngestOnce.
+ */
 export const IngestionServiceLive: Layer.Layer<
   IngestionService,
   never,
@@ -198,25 +253,6 @@ export const IngestionServiceLive: Layer.Layer<
   Effect.gen(function* () {
     const adapter = yield* OpenCodeAdapter;
     const { sqlite } = yield* DashboardDb;
-
-    const ingestOnce = Effect.gen(function* () {
-      const batch = yield* adapter.fetchBatch.pipe(
-        Effect.mapError(
-          (cause) =>
-            new IngestionError({
-              reason: `Failed to fetch batch from ${adapter.source}`,
-              cause,
-            }),
-        ),
-      );
-
-      if (batch === null) {
-        return;
-      }
-
-      yield* writeBatch(sqlite, batch);
-    });
-
-    return { ingestOnce };
+    return { ingestOnce: buildIngestOnce([adapter], sqlite) };
   }),
 );
