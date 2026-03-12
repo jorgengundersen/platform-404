@@ -4,7 +4,7 @@ import * as fs from "node:fs";
 
 import { Effect } from "effect";
 
-import { SourceDb, SourceDbLive } from "@/services/source-db";
+import { SourceDb, SourceDbLive } from "@/adapters/opencode/source-db";
 
 describe("SourceDb Effect service", () => {
   let tempDbPath: string;

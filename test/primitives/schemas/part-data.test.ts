@@ -1,6 +1,6 @@
 import { describe, expect, it } from "bun:test";
 import { Schema } from "@effect/schema";
-import { PartData } from "@/primitives/schemas/part-data";
+import { PartData } from "@/adapters/opencode/schemas/part-data";
 
 describe("PartData", () => {
   it("decodes text part", () => {

@@ -1,15 +1,14 @@
 import { Schema } from "@effect/schema";
 import { Context, Data, Effect, Layer, Option } from "effect";
-
-import { safeParseJson } from "@/primitives/json";
 import {
   AssistantMessageData,
   UserMessageData,
-} from "@/primitives/schemas/message-data";
-import { PartData } from "@/primitives/schemas/part-data";
+} from "@/adapters/opencode/schemas/message-data";
+import { PartData } from "@/adapters/opencode/schemas/part-data";
+import { SourceDb } from "@/adapters/opencode/source-db";
+import { safeParseJson } from "@/primitives/json";
 import { bucketByDay } from "@/primitives/time";
 import { DashboardDb } from "@/services/dashboard-db";
-import { SourceDb } from "@/services/source-db";
 
 // ---------------------------------------------------------------------------
 // Error type

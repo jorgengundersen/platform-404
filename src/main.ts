@@ -1,13 +1,12 @@
 import { HttpServer } from "@effect/platform";
 import { BunHttpServer, BunRuntime } from "@effect/platform-bun";
 import { Effect, Layer, Schedule } from "effect";
-
+import { SourceDbLive } from "@/adapters/opencode/source-db";
 import { createRouter } from "@/api/router";
 import { getConfig } from "@/config";
 import { getPort } from "@/primitives/port";
 import { DashboardDbLive } from "@/services/dashboard-db";
 import { IngestionService, IngestionServiceLive } from "@/services/ingestion";
-import { SourceDbLive } from "@/services/source-db";
 import { StatsServiceLive } from "@/services/stats";
 
 // ---------------------------------------------------------------------------

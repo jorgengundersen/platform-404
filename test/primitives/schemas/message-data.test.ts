@@ -4,7 +4,7 @@ import {
   AssistantMessageData,
   MessageData,
   UserMessageData,
-} from "@/primitives/schemas/message-data";
+} from "@/adapters/opencode/schemas/message-data";
 
 describe("AssistantMessageData", () => {
   it("decodes a full assistant message", () => {

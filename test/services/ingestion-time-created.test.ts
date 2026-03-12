@@ -3,10 +3,9 @@ import { afterAll, beforeAll, describe, expect, test } from "bun:test";
 import * as fs from "node:fs";
 
 import { Effect, Layer } from "effect";
-
+import { SourceDbLive } from "@/adapters/opencode/source-db";
 import { DashboardDb, DashboardDbTest } from "@/services/dashboard-db";
 import { IngestionService, IngestionServiceLive } from "@/services/ingestion";
-import { SourceDbLive } from "@/services/source-db";
 
 describe("IngestionService preserves time_created from source sessions", () => {
   let tempSourceDbPath: string;
