@@ -13,14 +13,28 @@ import { StatsServiceLive } from "@/services/stats";
 // Layer composition helpers
 // ---------------------------------------------------------------------------
 
+function getOpenCodeDbPath(
+  config: ReturnType<typeof getConfig>,
+): string | null {
+  for (const source of config.sources) {
+    if (source.type === "opencode") {
+      return source.dbPath;
+    }
+  }
+  return null;
+}
+
 function buildLayers(config: ReturnType<typeof getConfig>, port: number) {
   const dashboardDbLayer = DashboardDbLive(config.dashboardDbPath);
-  const sourceDbLayer = SourceDbLive(config.opencodeDbPath);
   const statsLayer = StatsServiceLive.pipe(Layer.provide(dashboardDbLayer));
-  const ingestionLayer = IngestionServiceLive.pipe(
-    Layer.provide(sourceDbLayer),
-    Layer.provide(dashboardDbLayer),
-  );
+  const opencodeDbPath = getOpenCodeDbPath(config);
+  const ingestionLayer =
+    opencodeDbPath === null
+      ? null
+      : IngestionServiceLive.pipe(
+          Layer.provide(SourceDbLive(opencodeDbPath)),
+          Layer.provide(dashboardDbLayer),
+        );
 
   // Wire the HTTP router layer: serve(router) needs HttpServer | DashboardDb | StatsService
   const router = createRouter();
@@ -75,11 +89,13 @@ export async function boot(): Promise<void> {
 
   const main = Effect.gen(function* () {
     // Start periodic ingestion as a background daemon fiber.
-    yield* Effect.forkDaemon(
-      buildIngestionLoop(config.syncIntervalMs).pipe(
-        Effect.provide(ingestionLayer),
-      ),
-    );
+    if (ingestionLayer !== null) {
+      yield* Effect.forkDaemon(
+        buildIngestionLoop(config.syncIntervalMs).pipe(
+          Effect.provide(ingestionLayer),
+        ),
+      );
+    }
 
     yield* Effect.log(`Server running on http://localhost:${port}`);
 
@@ -103,11 +119,13 @@ export function runMain(): void {
   const { ingestionLayer, serverLayer } = buildLayers(config, port);
 
   const main = Effect.gen(function* () {
-    yield* Effect.forkDaemon(
-      buildIngestionLoop(config.syncIntervalMs).pipe(
-        Effect.provide(ingestionLayer),
-      ),
-    );
+    if (ingestionLayer !== null) {
+      yield* Effect.forkDaemon(
+        buildIngestionLoop(config.syncIntervalMs).pipe(
+          Effect.provide(ingestionLayer),
+        ),
+      );
+    }
 
     yield* Effect.log(`Server running on http://localhost:${port}`);
     yield* Effect.never;

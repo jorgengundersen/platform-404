@@ -3,12 +3,53 @@ import { describe, expect, test } from "bun:test";
 import { getConfig } from "@/config";
 
 describe("getConfig", () => {
-  test("throws when OPENCODE_DB_PATH missing", () => {
-    expect(() =>
-      getConfig({
-        DASHBOARD_DB_PATH: "/tmp/dash.db",
-      }),
-    ).toThrow("Missing required env var: OPENCODE_DB_PATH");
+  test("adds opencode source when OPENCODE_DB_PATH is set", () => {
+    const cfg = getConfig({
+      OPENCODE_DB_PATH: "/tmp/oc.db",
+      DASHBOARD_DB_PATH: "/tmp/dash.db",
+    });
+
+    expect(cfg.sources).toEqual([
+      {
+        type: "opencode",
+        dbPath: "/tmp/oc.db",
+      },
+    ]);
+  });
+
+  test("supports zero sources when OPENCODE_DB_PATH missing", () => {
+    const cfg = getConfig({
+      DASHBOARD_DB_PATH: "/tmp/dash.db",
+    });
+
+    expect(cfg.sources).toEqual([]);
+  });
+
+  test("adds claude_code source when CLAUDE_CODE_OTEL=1", () => {
+    const cfg = getConfig({
+      DASHBOARD_DB_PATH: "/tmp/dash.db",
+      CLAUDE_CODE_OTEL: "1",
+    });
+
+    expect(cfg.sources).toEqual([{ type: "claude_code" }]);
+  });
+
+  test("supports multiple sources", () => {
+    const cfg = getConfig({
+      OPENCODE_DB_PATH: "/tmp/oc.db",
+      DASHBOARD_DB_PATH: "/tmp/dash.db",
+      CLAUDE_CODE_OTEL: "1",
+    });
+
+    expect(cfg.sources).toEqual([
+      {
+        type: "opencode",
+        dbPath: "/tmp/oc.db",
+      },
+      {
+        type: "claude_code",
+      },
+    ]);
   });
 
   test("throws when DASHBOARD_DB_PATH missing", () => {
