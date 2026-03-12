@@ -14,7 +14,7 @@ test("seed script creates message and part tables", () => {
   const result = spawnSync([
     "bun",
     "run",
-    path.resolve("scripts/seed-dev-opencode-db.ts"),
+    path.resolve("scripts/seed-dev-db.ts"),
     dbPath,
   ]);
 
@@ -31,4 +31,15 @@ test("seed script creates message and part tables", () => {
 
   expect(tables).toContain("message");
   expect(tables).toContain("part");
+});
+
+test("seeded session has source = 'opencode'", () => {
+  const db = new Database(dbPath, { readonly: true });
+  const rows = db
+    .query<{ source: string }, []>("SELECT source FROM session")
+    .all();
+  db.close();
+
+  expect(rows.length).toBeGreaterThan(0);
+  expect(rows[0]?.source).toBe("opencode");
 });
