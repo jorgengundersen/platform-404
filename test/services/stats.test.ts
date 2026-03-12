@@ -114,6 +114,85 @@ describe("StatsService.getOverview", () => {
     expect(result.avgCostPerSession).toBeCloseTo(0.075, 5);
     expect(result.avgMessagesPerSession).toBeCloseTo(1.5, 5);
   });
+
+  test("supports source filter while keeping aggregate behavior", async () => {
+    const program = Effect.gen(function* () {
+      const { sqlite } = yield* DashboardDb;
+      sqlite.exec(`
+        INSERT INTO sessions (id, source, project_id, project_name, title, version,
+          summary_additions, summary_deletions, summary_files,
+          message_count, total_cost, total_tokens_input, total_tokens_output,
+          total_tokens_reasoning, total_cache_read, total_cache_write,
+          time_created, time_updated, time_ingested)
+        VALUES
+          ('src-opencode', 'opencode', 'p1', 'ProjectA', 'OpenCode Session', '1.0',
+           0, 0, 0,
+           1, 10, 100, 200, 0, 0, 0,
+           1700000000000, 1700000000000, 1700000000000),
+          ('src-claude', 'claude-code', 'p1', 'ProjectA', 'Claude Session', '1.0',
+           0, 0, 0,
+           1, 5, 50, 100, 0, 0, 0,
+           1700000000000, 1700000000000, 1700000000000);
+
+        INSERT INTO daily_stats (date, source, session_count, message_count, total_cost,
+          total_tokens_input, total_tokens_output, total_tokens_reasoning,
+          total_cache_read, total_cache_write, time_updated)
+        VALUES
+          ('2023-11-14', 'opencode', 1, 1, 10, 100, 200, 0, 0, 0, 1700000000000),
+          ('2023-11-14', 'claude-code', 1, 1, 5, 50, 100, 0, 0, 0, 1700000000000);
+      `);
+
+      const stats = yield* StatsService;
+      const allOverview = yield* stats.getOverview();
+      const opencodeOverview = yield* stats.getOverview("opencode");
+      const allDaily = yield* stats.getDailyStats({
+        start: "2023-11-14",
+        end: "2023-11-14",
+      });
+      const opencodeDaily = yield* stats.getDailyStats(
+        {
+          start: "2023-11-14",
+          end: "2023-11-14",
+        },
+        "opencode",
+      );
+      const opencodeSessions = yield* stats.getSessions({ source: "opencode" });
+
+      return {
+        allOverview,
+        opencodeOverview,
+        allDaily,
+        opencodeDaily,
+        opencodeSessions,
+      };
+    });
+
+    const result = await Effect.runPromise(
+      program.pipe(
+        Effect.provide(StatsServiceLive),
+        Effect.provide(DashboardDbTest),
+      ),
+    );
+
+    expect(result.allOverview.totalSessions).toBe(2);
+    expect(result.allOverview.totalCost).toBeCloseTo(15, 5);
+    expect(result.opencodeOverview.totalSessions).toBe(1);
+    expect(result.opencodeOverview.totalCost).toBeCloseTo(10, 5);
+
+    expect(result.allDaily).toHaveLength(1);
+    expect(result.allDaily[0]?.source).toBe("all");
+    expect(result.allDaily[0]?.sessionCount).toBe(2);
+    expect(result.allDaily[0]?.totalCost).toBeCloseTo(15, 5);
+
+    expect(result.opencodeDaily).toHaveLength(1);
+    expect(result.opencodeDaily[0]?.source).toBe("opencode");
+    expect(result.opencodeDaily[0]?.sessionCount).toBe(1);
+    expect(result.opencodeDaily[0]?.totalCost).toBeCloseTo(10, 5);
+
+    expect(result.opencodeSessions).toHaveLength(1);
+    expect(result.opencodeSessions[0]?.id).toBe("src-opencode");
+    expect(result.opencodeSessions[0]?.source).toBe("opencode");
+  });
 });
 
 describe("StatsService.getDailyStats", () => {

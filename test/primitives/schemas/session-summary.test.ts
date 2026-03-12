@@ -9,6 +9,7 @@ describe("SessionSummary", () => {
   it("decodes a full session summary", () => {
     const raw = {
       id: "ses_abc",
+      source: "opencode",
       projectId: "proj_1",
       projectName: "my-project",
       title: "Fix bug",

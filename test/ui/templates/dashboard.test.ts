@@ -27,6 +27,7 @@ const overview: Overview = {
 const sessions: SessionSummary[] = [
   {
     id: "s1",
+    source: "opencode",
     projectId: "p1",
     projectName: "my-project",
     title: "Test Session",

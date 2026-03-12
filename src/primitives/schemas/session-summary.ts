@@ -2,6 +2,7 @@ import { Schema } from "@effect/schema";
 
 export const SessionSummary = Schema.Struct({
   id: Schema.String,
+  source: Schema.String,
   projectId: Schema.String,
   projectName: Schema.String,
   title: Schema.String,

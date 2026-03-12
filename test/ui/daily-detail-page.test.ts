@@ -5,6 +5,7 @@ import { dailyDetailPage } from "@/ui/templates/daily-detail";
 
 const makeStat = (): DailyStat => ({
   date: "2026-03-04",
+  source: "opencode",
   sessionCount: 2,
   messageCount: 10,
   totalCost: 0.05,
@@ -17,6 +18,7 @@ const makeStat = (): DailyStat => ({
 
 const makeSession = (id: string): SessionSummary => ({
   id,
+  source: "opencode",
   projectId: "p1",
   projectName: "my-project",
   title: `Session ${id}`,

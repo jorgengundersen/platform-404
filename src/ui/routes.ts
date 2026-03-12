@@ -16,6 +16,7 @@ import { sessionsPage } from "@/ui/templates/sessions-list";
 
 interface SessionRow {
   id: string;
+  source: string | null;
   project_id: string;
   project_name: string | null;
   title: string | null;
@@ -99,7 +100,7 @@ export const rootHandler = (
 
     const rows = sqlite
       .query<SessionRow, [number]>(
-        `SELECT id, project_id, project_name, title, message_count,
+        `SELECT id, source, project_id, project_name, title, message_count,
           total_cost, total_tokens_input, total_tokens_output,
           total_tokens_reasoning, total_cache_read, total_cache_write,
           time_created, time_updated
@@ -111,6 +112,7 @@ export const rootHandler = (
 
     const sessions = rows.map((r) => ({
       id: r.id,
+      source: r.source ?? "opencode",
       projectId: r.project_id,
       projectName: r.project_name || r.project_id.slice(0, 8),
       title: r.title ?? "",

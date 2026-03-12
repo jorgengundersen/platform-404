@@ -38,6 +38,7 @@ export interface DateRange {
 
 export interface DailyStat {
   readonly date: string;
+  readonly source: string;
   readonly sessionCount: number;
   readonly messageCount: number;
   readonly totalCost: number;
@@ -117,16 +118,21 @@ export interface ExpensiveSessionItem {
 export class StatsService extends Context.Tag("StatsService")<
   StatsService,
   {
-    readonly getOverview: () => Effect.Effect<Overview, StatsError>;
+    readonly getOverview: (
+      source?: string,
+    ) => Effect.Effect<Overview, StatsError>;
     readonly getDailyStats: (
       range: DateRange,
+      source?: string,
     ) => Effect.Effect<DailyStat[], StatsError>;
     readonly getKpiSummary: (params: {
       range: DashboardRangeQueryParam;
       compare: boolean;
+      source?: string;
     }) => Effect.Effect<KpiSummary, StatsError>;
     readonly getTrendSeries: (params: {
       range: DashboardRangeQueryParam;
+      source?: string;
     }) => Effect.Effect<TrendPoint[], StatsError>;
     readonly getProjectCostShare: (params: {
       range: DashboardRangeQueryParam;
@@ -136,9 +142,11 @@ export class StatsService extends Context.Tag("StatsService")<
     }) => Effect.Effect<CostShareItem[], StatsError>;
     readonly getAnomalies: (params: {
       range: DashboardRangeQueryParam;
+      source?: string;
     }) => Effect.Effect<AnomalyItem[], StatsError>;
     readonly getExpensiveSessions: (params: {
       range: DashboardRangeQueryParam;
+      source?: string;
     }) => Effect.Effect<ExpensiveSessionItem[], StatsError>;
     readonly getModelBreakdown: () => Effect.Effect<ModelStat[], StatsError>;
     readonly getProjectBreakdown: () => Effect.Effect<
@@ -150,6 +158,7 @@ export class StatsService extends Context.Tag("StatsService")<
     ) => Effect.Effect<SessionSummary[], StatsError>;
     readonly getSessions: (params: {
       projectId?: string;
+      source?: string;
     }) => Effect.Effect<SessionSummary[], StatsError>;
   }
 >() {}
@@ -171,6 +180,7 @@ interface OverviewRow {
 
 interface DailyStatRow {
   date: string;
+  source: string | null;
   session_count: number;
   message_count: number;
   total_cost: number | null;
@@ -201,6 +211,7 @@ interface ProjectStatRow {
 
 interface SessionRow {
   id: string;
+  source: string | null;
   project_id: string;
   project_name: string | null;
   title: string | null;
@@ -263,22 +274,59 @@ export const StatsServiceLive: Layer.Layer<StatsService, never, DashboardDb> =
     Effect.gen(function* () {
       const { sqlite } = yield* DashboardDb;
 
-      const getOverview = (): Effect.Effect<Overview, StatsError> =>
+      const getOverview = (
+        source?: string,
+      ): Effect.Effect<Overview, StatsError> =>
         Effect.try({
           try: () => {
-            const row = sqlite
-              .query<OverviewRow, []>(
-                `SELECT
-                  (SELECT COUNT(*) FROM sessions) AS total_sessions,
-                  (SELECT COUNT(*) FROM messages) AS total_messages,
-                  (SELECT SUM(total_cost) FROM sessions) AS total_cost,
-                  (SELECT SUM(total_tokens_input) FROM sessions) AS total_tokens_input,
-                  (SELECT SUM(total_tokens_output) FROM sessions) AS total_tokens_output,
-                  (SELECT SUM(total_tokens_reasoning) FROM sessions) AS total_tokens_reasoning,
-                  (SELECT SUM(total_cache_read) FROM sessions) AS total_cache_read,
-                  (SELECT SUM(total_cache_write) FROM sessions) AS total_cache_write`,
-              )
-              .get() as OverviewRow;
+            const row = source
+              ? (sqlite
+                  .query<
+                    OverviewRow,
+                    [
+                      string,
+                      string,
+                      string,
+                      string,
+                      string,
+                      string,
+                      string,
+                      string,
+                    ]
+                  >(
+                    `SELECT
+                      (SELECT COUNT(*) FROM sessions WHERE source = ?) AS total_sessions,
+                      (SELECT COUNT(*) FROM messages WHERE source = ?) AS total_messages,
+                      (SELECT SUM(total_cost) FROM sessions WHERE source = ?) AS total_cost,
+                      (SELECT SUM(total_tokens_input) FROM sessions WHERE source = ?) AS total_tokens_input,
+                      (SELECT SUM(total_tokens_output) FROM sessions WHERE source = ?) AS total_tokens_output,
+                      (SELECT SUM(total_tokens_reasoning) FROM sessions WHERE source = ?) AS total_tokens_reasoning,
+                      (SELECT SUM(total_cache_read) FROM sessions WHERE source = ?) AS total_cache_read,
+                      (SELECT SUM(total_cache_write) FROM sessions WHERE source = ?) AS total_cache_write`,
+                  )
+                  .get(
+                    source,
+                    source,
+                    source,
+                    source,
+                    source,
+                    source,
+                    source,
+                    source,
+                  ) as OverviewRow)
+              : (sqlite
+                  .query<OverviewRow, []>(
+                    `SELECT
+                      (SELECT COUNT(*) FROM sessions) AS total_sessions,
+                      (SELECT COUNT(*) FROM messages) AS total_messages,
+                      (SELECT SUM(total_cost) FROM sessions) AS total_cost,
+                      (SELECT SUM(total_tokens_input) FROM sessions) AS total_tokens_input,
+                      (SELECT SUM(total_tokens_output) FROM sessions) AS total_tokens_output,
+                      (SELECT SUM(total_tokens_reasoning) FROM sessions) AS total_tokens_reasoning,
+                      (SELECT SUM(total_cache_read) FROM sessions) AS total_cache_read,
+                      (SELECT SUM(total_cache_write) FROM sessions) AS total_cache_write`,
+                  )
+                  .get() as OverviewRow);
 
             const totalSessions = row.total_sessions ?? 0;
             const totalMessages = row.total_messages ?? 0;
@@ -305,23 +353,45 @@ export const StatsServiceLive: Layer.Layer<StatsService, never, DashboardDb> =
 
       const getDailyStats = (
         range: DateRange,
+        source?: string,
       ): Effect.Effect<DailyStat[], StatsError> =>
         Effect.try({
           try: () => {
-            const rows = sqlite
-              .query<DailyStatRow, [string, string]>(
-                `SELECT date, session_count, message_count, total_cost,
-                  total_tokens_input, total_tokens_output, total_tokens_reasoning,
-                  total_cache_read, total_cache_write
-                FROM daily_stats
-                WHERE date >= ? AND date <= ?
-                ORDER BY date ASC`,
-              )
-              .all(range.start, range.end);
+            const rows = source
+              ? sqlite
+                  .query<DailyStatRow, [string, string, string]>(
+                    `SELECT date, source, session_count, message_count, total_cost,
+                      total_tokens_input, total_tokens_output, total_tokens_reasoning,
+                      total_cache_read, total_cache_write
+                    FROM daily_stats
+                    WHERE date >= ? AND date <= ? AND source = ?
+                    ORDER BY date ASC`,
+                  )
+                  .all(range.start, range.end, source)
+              : sqlite
+                  .query<DailyStatRow, [string, string]>(
+                    `SELECT
+                      date,
+                      'all' AS source,
+                      SUM(session_count) AS session_count,
+                      SUM(message_count) AS message_count,
+                      SUM(total_cost) AS total_cost,
+                      SUM(total_tokens_input) AS total_tokens_input,
+                      SUM(total_tokens_output) AS total_tokens_output,
+                      SUM(total_tokens_reasoning) AS total_tokens_reasoning,
+                      SUM(total_cache_read) AS total_cache_read,
+                      SUM(total_cache_write) AS total_cache_write
+                    FROM daily_stats
+                    WHERE date >= ? AND date <= ?
+                    GROUP BY date
+                    ORDER BY date ASC`,
+                  )
+                  .all(range.start, range.end);
 
             return rows.map(
               (r): DailyStat => ({
                 date: r.date,
+                source: r.source ?? "opencode",
                 sessionCount: r.session_count,
                 messageCount: r.message_count,
                 totalCost: r.total_cost ?? 0,
@@ -358,18 +428,31 @@ export const StatsServiceLive: Layer.Layer<StatsService, never, DashboardDb> =
       const getKpiAggregate = (
         startMs: number,
         endMs: number,
+        source?: string,
       ): KpiAggregateRow =>
-        sqlite
-          .query<KpiAggregateRow, [number, number]>(
-            `SELECT
-              COUNT(*) AS session_count,
-              SUM(total_cost) AS total_cost,
-              SUM(total_tokens_input) AS total_tokens_input,
-              SUM(total_tokens_output) AS total_tokens_output
-            FROM sessions
-            WHERE time_updated >= ? AND time_updated <= ?`,
-          )
-          .get(startMs, endMs) as KpiAggregateRow;
+        source
+          ? (sqlite
+              .query<KpiAggregateRow, [number, number, string]>(
+                `SELECT
+                  COUNT(*) AS session_count,
+                  SUM(total_cost) AS total_cost,
+                  SUM(total_tokens_input) AS total_tokens_input,
+                  SUM(total_tokens_output) AS total_tokens_output
+                FROM sessions
+                WHERE time_updated >= ? AND time_updated <= ? AND source = ?`,
+              )
+              .get(startMs, endMs, source) as KpiAggregateRow)
+          : (sqlite
+              .query<KpiAggregateRow, [number, number]>(
+                `SELECT
+                  COUNT(*) AS session_count,
+                  SUM(total_cost) AS total_cost,
+                  SUM(total_tokens_input) AS total_tokens_input,
+                  SUM(total_tokens_output) AS total_tokens_output
+                FROM sessions
+                WHERE time_updated >= ? AND time_updated <= ?`,
+              )
+              .get(startMs, endMs) as KpiAggregateRow);
 
       const toKpiMetrics = (row: KpiAggregateRow) => {
         const sessions = row.session_count ?? 0;
@@ -392,6 +475,7 @@ export const StatsServiceLive: Layer.Layer<StatsService, never, DashboardDb> =
       const getKpiSummary = (params: {
         range: DashboardRangeQueryParam;
         compare: boolean;
+        source?: string;
       }): Effect.Effect<KpiSummary, StatsError> =>
         Effect.try({
           try: () => {
@@ -402,7 +486,9 @@ export const StatsServiceLive: Layer.Layer<StatsService, never, DashboardDb> =
             const previousStartMs = currentStartMs - rangeDays * dayMs;
             const previousEndMs = currentStartMs - 1;
 
-            const current = toKpiMetrics(getKpiAggregate(currentStartMs, now));
+            const current = toKpiMetrics(
+              getKpiAggregate(currentStartMs, now, params.source),
+            );
             if (!params.compare) {
               return {
                 spend: { value: current.spend, deltaPct: null },
@@ -419,7 +505,7 @@ export const StatsServiceLive: Layer.Layer<StatsService, never, DashboardDb> =
             }
 
             const previous = toKpiMetrics(
-              getKpiAggregate(previousStartMs, previousEndMs),
+              getKpiAggregate(previousStartMs, previousEndMs, params.source),
             );
 
             return {
@@ -453,6 +539,7 @@ export const StatsServiceLive: Layer.Layer<StatsService, never, DashboardDb> =
 
       const getTrendSeries = (params: {
         range: DashboardRangeQueryParam;
+        source?: string;
       }): Effect.Effect<TrendPoint[], StatsError> =>
         Effect.try({
           try: () => {
@@ -460,16 +547,36 @@ export const StatsServiceLive: Layer.Layer<StatsService, never, DashboardDb> =
               params.range,
             );
 
-            const rows = sqlite
-              .query<DailyStatRow, [string, string]>(
-                `SELECT date, session_count, message_count, total_cost,
-                  total_tokens_input, total_tokens_output, total_tokens_reasoning,
-                  total_cache_read, total_cache_write
-                FROM daily_stats
-                WHERE date >= ? AND date <= ?
-                ORDER BY date ASC`,
-              )
-              .all(start, end);
+            const rows = params.source
+              ? sqlite
+                  .query<DailyStatRow, [string, string, string]>(
+                    `SELECT date, source, session_count, message_count, total_cost,
+                      total_tokens_input, total_tokens_output, total_tokens_reasoning,
+                      total_cache_read, total_cache_write
+                    FROM daily_stats
+                    WHERE date >= ? AND date <= ? AND source = ?
+                    ORDER BY date ASC`,
+                  )
+                  .all(start, end, params.source)
+              : sqlite
+                  .query<DailyStatRow, [string, string]>(
+                    `SELECT
+                      date,
+                      'all' AS source,
+                      SUM(session_count) AS session_count,
+                      SUM(message_count) AS message_count,
+                      SUM(total_cost) AS total_cost,
+                      SUM(total_tokens_input) AS total_tokens_input,
+                      SUM(total_tokens_output) AS total_tokens_output,
+                      SUM(total_tokens_reasoning) AS total_tokens_reasoning,
+                      SUM(total_cache_read) AS total_cache_read,
+                      SUM(total_cache_write) AS total_cache_write
+                    FROM daily_stats
+                    WHERE date >= ? AND date <= ?
+                    GROUP BY date
+                    ORDER BY date ASC`,
+                  )
+                  .all(start, end);
 
             const byDate = new Map(rows.map((row) => [row.date, row]));
             return dateRangeDays(start, end).map((date): TrendPoint => {
@@ -605,6 +712,7 @@ export const StatsServiceLive: Layer.Layer<StatsService, never, DashboardDb> =
 
       const getAnomalies = (params: {
         range: DashboardRangeQueryParam;
+        source?: string;
       }): Effect.Effect<AnomalyItem[], StatsError> =>
         Effect.try({
           try: () => {
@@ -612,14 +720,24 @@ export const StatsServiceLive: Layer.Layer<StatsService, never, DashboardDb> =
               params.range,
             );
 
-            const costRows = sqlite
-              .query<DailyCostRow, [string, string]>(
-                `SELECT date, total_cost
-                 FROM daily_stats
-                 WHERE date >= ? AND date <= ?
-                 ORDER BY date ASC`,
-              )
-              .all(startDate, endDate);
+            const costRows = params.source
+              ? sqlite
+                  .query<DailyCostRow, [string, string, string]>(
+                    `SELECT date, total_cost
+                     FROM daily_stats
+                     WHERE date >= ? AND date <= ? AND source = ?
+                     ORDER BY date ASC`,
+                  )
+                  .all(startDate, endDate, params.source)
+              : sqlite
+                  .query<DailyCostRow, [string, string]>(
+                    `SELECT date, SUM(total_cost) AS total_cost
+                     FROM daily_stats
+                     WHERE date >= ? AND date <= ?
+                     GROUP BY date
+                     ORDER BY date ASC`,
+                  )
+                  .all(startDate, endDate);
 
             const anomalies: AnomalyItem[] = [];
 
@@ -642,22 +760,40 @@ export const StatsServiceLive: Layer.Layer<StatsService, never, DashboardDb> =
               });
             }
 
-            const modelRows = sqlite
-              .query<ModelDailyCostRow, [number, number]>(
-                `SELECT
-                   date(time_created / 1000, 'unixepoch') AS date,
-                   provider_id,
-                   model_id,
-                   SUM(cost) AS total_cost
-                 FROM messages
-                 WHERE role = 'assistant'
-                   AND model_id IS NOT NULL
-                   AND time_created >= ?
-                   AND time_created <= ?
-                 GROUP BY date, provider_id, model_id
-                 ORDER BY model_id ASC, provider_id ASC, date ASC`,
-              )
-              .all(startMs, endMs);
+            const modelRows = params.source
+              ? sqlite
+                  .query<ModelDailyCostRow, [number, number, string]>(
+                    `SELECT
+                       date(time_created / 1000, 'unixepoch') AS date,
+                       provider_id,
+                       model_id,
+                       SUM(cost) AS total_cost
+                     FROM messages
+                     WHERE role = 'assistant'
+                       AND model_id IS NOT NULL
+                       AND time_created >= ?
+                       AND time_created <= ?
+                       AND source = ?
+                     GROUP BY date, provider_id, model_id
+                     ORDER BY model_id ASC, provider_id ASC, date ASC`,
+                  )
+                  .all(startMs, endMs, params.source)
+              : sqlite
+                  .query<ModelDailyCostRow, [number, number]>(
+                    `SELECT
+                       date(time_created / 1000, 'unixepoch') AS date,
+                       provider_id,
+                       model_id,
+                       SUM(cost) AS total_cost
+                     FROM messages
+                     WHERE role = 'assistant'
+                       AND model_id IS NOT NULL
+                       AND time_created >= ?
+                       AND time_created <= ?
+                     GROUP BY date, provider_id, model_id
+                     ORDER BY model_id ASC, provider_id ASC, date ASC`,
+                  )
+                  .all(startMs, endMs);
 
             const previousByModel = new Map<string, number>();
             for (const row of modelRows) {
@@ -689,24 +825,39 @@ export const StatsServiceLive: Layer.Layer<StatsService, never, DashboardDb> =
 
       const getExpensiveSessions = (params: {
         range: DashboardRangeQueryParam;
+        source?: string;
       }): Effect.Effect<ExpensiveSessionItem[], StatsError> =>
         Effect.try({
           try: () => {
             const { startMs, endMs } = getRangeBounds(params.range);
 
-            const rows = sqlite
-              .query<ExpensiveSessionRow, [number, number]>(
-                `SELECT
-                   id,
-                   title,
-                   total_cost,
-                   date(time_updated / 1000, 'unixepoch') AS date
-                 FROM sessions
-                 WHERE time_updated >= ? AND time_updated <= ?
-                 ORDER BY total_cost DESC, time_updated DESC
-                 LIMIT 5`,
-              )
-              .all(startMs, endMs);
+            const rows = params.source
+              ? sqlite
+                  .query<ExpensiveSessionRow, [number, number, string]>(
+                    `SELECT
+                       id,
+                       title,
+                       total_cost,
+                       date(time_updated / 1000, 'unixepoch') AS date
+                     FROM sessions
+                     WHERE time_updated >= ? AND time_updated <= ? AND source = ?
+                     ORDER BY total_cost DESC, time_updated DESC
+                     LIMIT 5`,
+                  )
+                  .all(startMs, endMs, params.source)
+              : sqlite
+                  .query<ExpensiveSessionRow, [number, number]>(
+                    `SELECT
+                       id,
+                       title,
+                       total_cost,
+                       date(time_updated / 1000, 'unixepoch') AS date
+                     FROM sessions
+                     WHERE time_updated >= ? AND time_updated <= ?
+                     ORDER BY total_cost DESC, time_updated DESC
+                     LIMIT 5`,
+                  )
+                  .all(startMs, endMs);
 
             return rows.map(
               (row): ExpensiveSessionItem => ({
@@ -805,7 +956,7 @@ export const StatsServiceLive: Layer.Layer<StatsService, never, DashboardDb> =
           try: () => {
             const rows = sqlite
               .query<SessionRow, [string]>(
-                `SELECT id, project_id, project_name, title, message_count,
+                `SELECT id, source, project_id, project_name, title, message_count,
                   total_cost, total_tokens_input, total_tokens_output,
                   total_tokens_reasoning, total_cache_read, total_cache_write,
                   time_created, time_updated
@@ -818,6 +969,7 @@ export const StatsServiceLive: Layer.Layer<StatsService, never, DashboardDb> =
             return rows.map(
               (r): SessionSummary => ({
                 id: r.id,
+                source: r.source ?? "opencode",
                 projectId: r.project_id,
                 projectName: formatProjectName(r.project_name, r.project_id),
                 title: r.title ?? "",
@@ -842,35 +994,62 @@ export const StatsServiceLive: Layer.Layer<StatsService, never, DashboardDb> =
 
       const getSessions = (params: {
         projectId?: string;
+        source?: string;
       }): Effect.Effect<SessionSummary[], StatsError> =>
         Effect.try({
           try: () => {
-            const rows = params.projectId
-              ? sqlite
-                  .query<SessionRow, [string]>(
-                    `SELECT id, project_id, project_name, title, message_count,
+            const rows =
+              params.projectId && params.source
+                ? sqlite
+                    .query<SessionRow, [string, string]>(
+                      `SELECT id, source, project_id, project_name, title, message_count,
                       total_cost, total_tokens_input, total_tokens_output,
                       total_tokens_reasoning, total_cache_read, total_cache_write,
                       time_created, time_updated
                     FROM sessions
-                    WHERE project_id = ?
+                    WHERE project_id = ? AND source = ?
                     ORDER BY time_updated DESC`,
-                  )
-                  .all(params.projectId)
-              : sqlite
-                  .query<SessionRow, []>(
-                    `SELECT id, project_id, project_name, title, message_count,
-                      total_cost, total_tokens_input, total_tokens_output,
-                      total_tokens_reasoning, total_cache_read, total_cache_write,
-                      time_created, time_updated
-                    FROM sessions
-                    ORDER BY time_updated DESC`,
-                  )
-                  .all();
+                    )
+                    .all(params.projectId, params.source)
+                : params.projectId
+                  ? sqlite
+                      .query<SessionRow, [string]>(
+                        `SELECT id, source, project_id, project_name, title, message_count,
+                        total_cost, total_tokens_input, total_tokens_output,
+                        total_tokens_reasoning, total_cache_read, total_cache_write,
+                        time_created, time_updated
+                      FROM sessions
+                      WHERE project_id = ?
+                      ORDER BY time_updated DESC`,
+                      )
+                      .all(params.projectId)
+                  : params.source
+                    ? sqlite
+                        .query<SessionRow, [string]>(
+                          `SELECT id, source, project_id, project_name, title, message_count,
+                          total_cost, total_tokens_input, total_tokens_output,
+                          total_tokens_reasoning, total_cache_read, total_cache_write,
+                          time_created, time_updated
+                        FROM sessions
+                        WHERE source = ?
+                        ORDER BY time_updated DESC`,
+                        )
+                        .all(params.source)
+                    : sqlite
+                        .query<SessionRow, []>(
+                          `SELECT id, source, project_id, project_name, title, message_count,
+                          total_cost, total_tokens_input, total_tokens_output,
+                          total_tokens_reasoning, total_cache_read, total_cache_write,
+                          time_created, time_updated
+                        FROM sessions
+                        ORDER BY time_updated DESC`,
+                        )
+                        .all();
 
             return rows.map(
               (r): SessionSummary => ({
                 id: r.id,
+                source: r.source ?? "opencode",
                 projectId: r.project_id,
                 projectName: formatProjectName(r.project_name, r.project_id),
                 title: r.title ?? "",
