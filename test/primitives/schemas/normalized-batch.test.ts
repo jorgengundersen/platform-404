@@ -49,11 +49,16 @@ describe("NormalizedBatch", () => {
       ],
       cursorKey: "opencode:session",
       cursorValue: 1700000100000,
+      cursorUpdates: [
+        { key: "opencode:session", value: 1700000100000 },
+        { key: "opencode:message", value: 1700000090000 },
+      ],
     };
 
     const decoded = Schema.decodeUnknownSync(NormalizedBatch)(raw);
     expect(decoded.sessions[0]?.id).toBe("ses_1");
     expect(decoded.messages[0]?.modelId).toBe("claude-sonnet-4-6");
     expect(decoded.cursorValue).toBe(1700000100000);
+    expect(decoded.cursorUpdates).toHaveLength(2);
   });
 });

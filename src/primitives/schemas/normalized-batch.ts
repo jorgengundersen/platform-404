@@ -52,6 +52,12 @@ export const NormalizedBatch = Schema.Struct({
   messages: Schema.Array(NormalizedMessage),
   cursorKey: Schema.String,
   cursorValue: Schema.Number,
+  cursorUpdates: Schema.Array(
+    Schema.Struct({
+      key: Schema.String,
+      value: Schema.Number,
+    }),
+  ),
 });
 
 export type NormalizedBatch = typeof NormalizedBatch.Type;

@@ -3,6 +3,7 @@ import { afterAll, beforeAll, describe, expect, test } from "bun:test";
 import * as fs from "node:fs";
 
 import { Effect, Layer } from "effect";
+import { OpenCodeAdapterLive } from "@/adapters/opencode/adapter";
 import { SourceDbLive } from "@/adapters/opencode/source-db";
 import { DashboardDb, DashboardDbTest } from "@/services/dashboard-db";
 import { IngestionService, IngestionServiceLive } from "@/services/ingestion";
@@ -71,9 +72,14 @@ describe("IngestionService step-finish parts", () => {
   });
 
   const makeTestLayer = (sourcePath: string) => {
-    const baseDeps = Layer.merge(SourceDbLive(sourcePath), DashboardDbTest);
-    return IngestionServiceLive.pipe(Layer.provide(baseDeps)).pipe(
-      Layer.provideMerge(baseDeps),
+    const base = Layer.merge(SourceDbLive(sourcePath), DashboardDbTest);
+    const adapter = OpenCodeAdapterLive.pipe(Layer.provide(base)).pipe(
+      Layer.provideMerge(base),
+    );
+    return IngestionServiceLive.pipe(
+      Layer.provide(adapter),
+      Layer.provide(base),
+      Layer.provideMerge(base),
     );
   };
 

@@ -1,27 +1,14 @@
-import { Schema } from "@effect/schema";
-import { Context, Data, Effect, Layer, Option } from "effect";
-import {
-  AssistantMessageData,
-  UserMessageData,
-} from "@/adapters/opencode/schemas/message-data";
-import { PartData } from "@/adapters/opencode/schemas/part-data";
-import { SourceDb } from "@/adapters/opencode/source-db";
-import { safeParseJson } from "@/primitives/json";
+import type { Database } from "bun:sqlite";
+import { Context, Data, Effect, Layer } from "effect";
+import { OpenCodeAdapter } from "@/adapters/opencode/adapter";
+import type { NormalizedBatch } from "@/primitives/schemas/normalized-batch";
 import { bucketByDay } from "@/primitives/time";
 import { DashboardDb } from "@/services/dashboard-db";
-
-// ---------------------------------------------------------------------------
-// Error type
-// ---------------------------------------------------------------------------
 
 export class IngestionError extends Data.TaggedError("IngestionError")<{
   readonly reason: string;
   readonly cause?: unknown;
 }> {}
-
-// ---------------------------------------------------------------------------
-// Service interface
-// ---------------------------------------------------------------------------
 
 export class IngestionService extends Context.Tag("IngestionService")<
   IngestionService,
@@ -30,418 +17,204 @@ export class IngestionService extends Context.Tag("IngestionService")<
   }
 >() {}
 
-// ---------------------------------------------------------------------------
-// Helpers
-// ---------------------------------------------------------------------------
+function extractAgent(metadata: Record<string, unknown> | null): string | null {
+  if (metadata === null) return null;
+  const value = metadata.agent;
+  return typeof value === "string" ? value : null;
+}
 
-const decodeAssistant = Schema.decodeUnknownOption(AssistantMessageData);
-const decodeUser = Schema.decodeUnknownOption(UserMessageData);
-const decodePart = Schema.decodeUnknownOption(PartData);
+function writeBatch(
+  sqlite: Database,
+  batch: NormalizedBatch,
+): Effect.Effect<void, IngestionError> {
+  return Effect.gen(function* () {
+    const now = Date.now();
 
-// ---------------------------------------------------------------------------
-// Layer
-// ---------------------------------------------------------------------------
+    sqlite.exec("BEGIN TRANSACTION");
+    try {
+      const upsertMessage = sqlite.prepare(`
+        INSERT INTO messages (
+          id, source, metadata, session_id, role, provider_id, model_id, agent,
+          cost, tokens_input, tokens_output, tokens_reasoning,
+          cache_read, cache_write, time_created, time_ingested
+        ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+        ON CONFLICT(id) DO UPDATE SET
+          source = excluded.source,
+          metadata = excluded.metadata,
+          session_id = excluded.session_id,
+          role = excluded.role,
+          provider_id = excluded.provider_id,
+          model_id = excluded.model_id,
+          agent = excluded.agent,
+          cost = excluded.cost,
+          tokens_input = excluded.tokens_input,
+          tokens_output = excluded.tokens_output,
+          tokens_reasoning = excluded.tokens_reasoning,
+          cache_read = excluded.cache_read,
+          cache_write = excluded.cache_write,
+          time_created = excluded.time_created,
+          time_ingested = excluded.time_ingested
+      `);
+
+      for (const message of batch.messages) {
+        upsertMessage.run(
+          message.id,
+          message.source,
+          message.metadata === null ? null : JSON.stringify(message.metadata),
+          message.sessionId,
+          message.role,
+          message.providerId,
+          message.modelId,
+          extractAgent(message.metadata),
+          message.cost,
+          message.tokensInput,
+          message.tokensOutput,
+          message.tokensReasoning,
+          message.cacheRead,
+          message.cacheWrite,
+          message.timeCreated,
+          now,
+        );
+      }
+
+      const upsertSession = sqlite.prepare(`
+        INSERT INTO sessions (
+          id, source, metadata, project_id, project_name, title,
+          message_count, total_cost, total_tokens_input, total_tokens_output,
+          total_tokens_reasoning, total_cache_read, total_cache_write,
+          time_created, time_updated, time_ingested
+        ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+        ON CONFLICT(id) DO UPDATE SET
+          source = excluded.source,
+          metadata = excluded.metadata,
+          project_id = excluded.project_id,
+          project_name = excluded.project_name,
+          title = excluded.title,
+          message_count = excluded.message_count,
+          total_cost = excluded.total_cost,
+          total_tokens_input = excluded.total_tokens_input,
+          total_tokens_output = excluded.total_tokens_output,
+          total_tokens_reasoning = excluded.total_tokens_reasoning,
+          total_cache_read = excluded.total_cache_read,
+          total_cache_write = excluded.total_cache_write,
+          time_created = excluded.time_created,
+          time_updated = excluded.time_updated,
+          time_ingested = excluded.time_ingested
+      `);
+
+      for (const session of batch.sessions) {
+        upsertSession.run(
+          session.id,
+          session.source,
+          session.metadata === null ? null : JSON.stringify(session.metadata),
+          session.projectId,
+          session.projectName,
+          session.title,
+          session.messageCount,
+          session.totalCost,
+          session.totalTokensInput,
+          session.totalTokensOutput,
+          session.totalTokensReasoning,
+          session.totalCacheRead,
+          session.totalCacheWrite,
+          session.timeCreated,
+          session.timeUpdated,
+          now,
+        );
+      }
+
+      const upsertDaily = sqlite.prepare(`
+        INSERT INTO daily_stats (
+          date, source, session_count, message_count, total_cost,
+          total_tokens_input, total_tokens_output, total_tokens_reasoning,
+          total_cache_read, total_cache_write, time_updated
+        )
+        SELECT
+          ? AS date,
+          ? AS source,
+          COUNT(DISTINCT s.id) AS session_count,
+          COALESCE(SUM(s.message_count), 0) AS message_count,
+          COALESCE(SUM(s.total_cost), 0) AS total_cost,
+          COALESCE(SUM(s.total_tokens_input), 0) AS total_tokens_input,
+          COALESCE(SUM(s.total_tokens_output), 0) AS total_tokens_output,
+          COALESCE(SUM(s.total_tokens_reasoning), 0) AS total_tokens_reasoning,
+          COALESCE(SUM(s.total_cache_read), 0) AS total_cache_read,
+          COALESCE(SUM(s.total_cache_write), 0) AS total_cache_write,
+          ? AS time_updated
+        FROM sessions s
+        WHERE date(s.time_updated / 1000, 'unixepoch') = ?
+          AND s.source = ?
+        ON CONFLICT(date, source) DO UPDATE SET
+          session_count = excluded.session_count,
+          message_count = excluded.message_count,
+          total_cost = excluded.total_cost,
+          total_tokens_input = excluded.total_tokens_input,
+          total_tokens_output = excluded.total_tokens_output,
+          total_tokens_reasoning = excluded.total_tokens_reasoning,
+          total_cache_read = excluded.total_cache_read,
+          total_cache_write = excluded.total_cache_write,
+          time_updated = excluded.time_updated
+      `);
+
+      const dateBuckets = new Set(
+        batch.sessions.map((session) => bucketByDay(session.timeUpdated)),
+      );
+      for (const date of dateBuckets) {
+        upsertDaily.run(date, batch.source, now, date, batch.source);
+      }
+
+      const cursorUpdates =
+        batch.cursorUpdates.length > 0
+          ? batch.cursorUpdates
+          : [{ key: batch.cursorKey, value: batch.cursorValue }];
+      const upsertCursor = sqlite.prepare(`
+        INSERT INTO ingestion_cursor (source, last_time_updated, last_synced_at)
+        VALUES (?, ?, ?)
+        ON CONFLICT(source) DO UPDATE SET
+          last_time_updated = excluded.last_time_updated,
+          last_synced_at = excluded.last_synced_at
+      `);
+
+      for (const cursor of cursorUpdates) {
+        upsertCursor.run(cursor.key, cursor.value, now);
+      }
+
+      sqlite.exec("COMMIT");
+    } catch (cause) {
+      sqlite.exec("ROLLBACK");
+      yield* Effect.fail(
+        new IngestionError({ reason: "Transaction failed", cause }),
+      );
+    }
+  });
+}
 
 export const IngestionServiceLive: Layer.Layer<
   IngestionService,
   never,
-  SourceDb | DashboardDb
+  OpenCodeAdapter | DashboardDb
 > = Layer.effect(
   IngestionService,
   Effect.gen(function* () {
-    const sourceDb = yield* SourceDb;
+    const adapter = yield* OpenCodeAdapter;
     const { sqlite } = yield* DashboardDb;
 
     const ingestOnce = Effect.gen(function* () {
-      // ---- 1. Sessions ----
-      const sessionCursorRow = sqlite
-        .query(
-          "SELECT last_time_updated FROM ingestion_cursor WHERE source = 'opencode:session'",
-        )
-        .get() as { last_time_updated: number } | null;
-
-      const sessionSinceMs = sessionCursorRow?.last_time_updated ?? -1;
-
-      const sessions = yield* sourceDb
-        .listSessionsUpdatedSince(sessionSinceMs)
-        .pipe(
-          Effect.mapError(
-            (e) =>
-              new IngestionError({
-                reason: "Failed to list sessions",
-                cause: e,
-              }),
-          ),
-        );
-
-      if (sessions.length === 0) return;
-
-      const projectIds = Array.from(new Set(sessions.map((s) => s.project_id)));
-      const projects = yield* sourceDb.listProjectsByIds(projectIds).pipe(
+      const batch = yield* adapter.fetchBatch.pipe(
         Effect.mapError(
-          (e) =>
+          (cause) =>
             new IngestionError({
-              reason: "Failed to list projects",
-              cause: e,
-            }),
-        ),
-      );
-      const projectNameMap = new Map(projects.map((p) => [p.id, p.name]));
-
-      // ---- 2. Messages ----
-      const sessionIds = sessions.map((s) => s.id);
-      const messages = yield* sourceDb.listMessagesForSessions(sessionIds).pipe(
-        Effect.mapError(
-          (e) =>
-            new IngestionError({
-              reason: "Failed to list messages",
-              cause: e,
+              reason: `Failed to fetch batch from ${adapter.source}`,
+              cause,
             }),
         ),
       );
 
-      // ---- 3. Parts (step-finish) ----
-      const messageIds = messages.map((m) => m.id);
-      const parts = yield* sourceDb.listPartsForMessages(messageIds).pipe(
-        Effect.mapError(
-          (e) =>
-            new IngestionError({
-              reason: "Failed to list parts",
-              cause: e,
-            }),
-        ),
-      );
-
-      const now = Date.now();
-
-      // ---- 4. Write everything in one transaction ----
-      sqlite.exec("BEGIN TRANSACTION");
-      try {
-        // Upsert messages
-        const upsertMsg = sqlite.prepare(`
-          INSERT INTO messages (
-            id, session_id, role, provider_id, model_id, agent,
-            cost, tokens_input, tokens_output, tokens_reasoning,
-            cache_read, cache_write, time_created, time_ingested
-          ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
-          ON CONFLICT(id) DO UPDATE SET
-            role = excluded.role,
-            provider_id = excluded.provider_id,
-            model_id = excluded.model_id,
-            agent = excluded.agent,
-            cost = excluded.cost,
-            tokens_input = excluded.tokens_input,
-            tokens_output = excluded.tokens_output,
-            tokens_reasoning = excluded.tokens_reasoning,
-            cache_read = excluded.cache_read,
-            cache_write = excluded.cache_write,
-            time_ingested = excluded.time_ingested
-        `);
-
-        for (const msg of messages) {
-          const parsed = safeParseJson(msg.data);
-          const raw = Option.getOrNull(parsed);
-
-          const assistant =
-            raw !== null ? Option.getOrNull(decodeAssistant(raw)) : null;
-          const user = raw !== null ? Option.getOrNull(decodeUser(raw)) : null;
-
-          if (assistant !== null) {
-            upsertMsg.run(
-              msg.id,
-              msg.session_id,
-              "assistant",
-              assistant.providerID,
-              assistant.modelID,
-              null,
-              assistant.cost,
-              assistant.tokens.input,
-              assistant.tokens.output,
-              assistant.tokens.reasoning,
-              assistant.tokens.cacheRead,
-              assistant.tokens.cacheWrite,
-              msg.time_created,
-              now,
-            );
-          } else if (user !== null) {
-            upsertMsg.run(
-              msg.id,
-              msg.session_id,
-              "user",
-              user.model.providerID,
-              user.model.modelID,
-              user.agent,
-              null,
-              null,
-              null,
-              null,
-              null,
-              null,
-              msg.time_created,
-              now,
-            );
-          } else {
-            // Unknown role/format: still insert with minimal data
-            const roleRaw =
-              raw !== null &&
-              typeof raw === "object" &&
-              "role" in raw &&
-              typeof (raw as Record<string, unknown>).role === "string"
-                ? (raw as Record<string, unknown>).role
-                : "unknown";
-            const role = String(roleRaw);
-            upsertMsg.run(
-              msg.id,
-              msg.session_id,
-              role,
-              null,
-              null,
-              null,
-              null,
-              null,
-              null,
-              null,
-              null,
-              null,
-              msg.time_created,
-              now,
-            );
-          }
-        }
-
-        // Compute per-session aggregates from ingested messages
-        // Group messages by session_id
-        const sessionMsgMap = new Map<
-          string,
-          {
-            cost: number;
-            tokens_input: number;
-            tokens_output: number;
-            tokens_reasoning: number;
-            cache_read: number;
-            cache_write: number;
-            count: number;
-          }
-        >();
-
-        for (const msg of messages) {
-          const existing = sessionMsgMap.get(msg.session_id) ?? {
-            cost: 0,
-            tokens_input: 0,
-            tokens_output: 0,
-            tokens_reasoning: 0,
-            cache_read: 0,
-            cache_write: 0,
-            count: 0,
-          };
-
-          const parsed = safeParseJson(msg.data);
-          const raw = Option.getOrNull(parsed);
-          const assistant =
-            raw !== null ? Option.getOrNull(decodeAssistant(raw)) : null;
-
-          sessionMsgMap.set(msg.session_id, {
-            cost: existing.cost + (assistant?.cost ?? 0),
-            tokens_input:
-              existing.tokens_input + (assistant?.tokens.input ?? 0),
-            tokens_output:
-              existing.tokens_output + (assistant?.tokens.output ?? 0),
-            tokens_reasoning:
-              existing.tokens_reasoning + (assistant?.tokens.reasoning ?? 0),
-            cache_read:
-              existing.cache_read + (assistant?.tokens.cacheRead ?? 0),
-            cache_write:
-              existing.cache_write + (assistant?.tokens.cacheWrite ?? 0),
-            count: existing.count + 1,
-          });
-        }
-
-        // Build a message_id -> session_id lookup for parts
-        const msgSessionMap = new Map(
-          messages.map((m) => [m.id, m.session_id]),
-        );
-
-        // Compute per-session aggregates from step-finish parts
-        const sessionPartsMap = new Map<
-          string,
-          {
-            cost: number;
-            tokens_input: number;
-            tokens_output: number;
-            tokens_reasoning: number;
-            cache_read: number;
-            cache_write: number;
-          }
-        >();
-
-        for (const part of parts) {
-          const parsed = safeParseJson(part.data);
-          const raw = Option.getOrNull(parsed);
-          const decoded =
-            raw !== null ? Option.getOrNull(decodePart(raw)) : null;
-          if (decoded === null || decoded.type !== "step-finish") continue;
-
-          const sessionId =
-            msgSessionMap.get(part.message_id) ?? part.session_id;
-          const existing = sessionPartsMap.get(sessionId) ?? {
-            cost: 0,
-            tokens_input: 0,
-            tokens_output: 0,
-            tokens_reasoning: 0,
-            cache_read: 0,
-            cache_write: 0,
-          };
-
-          sessionPartsMap.set(sessionId, {
-            cost: existing.cost + decoded.cost,
-            tokens_input: existing.tokens_input + decoded.tokens.input,
-            tokens_output: existing.tokens_output + decoded.tokens.output,
-            tokens_reasoning:
-              existing.tokens_reasoning + decoded.tokens.reasoning,
-            cache_read: existing.cache_read + decoded.tokens.cacheRead,
-            cache_write: existing.cache_write + decoded.tokens.cacheWrite,
-          });
-        }
-
-        // Upsert sessions
-        const upsertSession = sqlite.prepare(`
-          INSERT INTO sessions (
-            id, project_id, project_name, title,
-            message_count, total_cost,
-            total_tokens_input, total_tokens_output, total_tokens_reasoning,
-            total_cache_read, total_cache_write,
-            time_created, time_updated, time_ingested
-          ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
-          ON CONFLICT(id) DO UPDATE SET
-            project_id = excluded.project_id,
-            project_name = excluded.project_name,
-            title = excluded.title,
-            message_count = excluded.message_count,
-            total_cost = excluded.total_cost,
-            total_tokens_input = excluded.total_tokens_input,
-            total_tokens_output = excluded.total_tokens_output,
-            total_tokens_reasoning = excluded.total_tokens_reasoning,
-            total_cache_read = excluded.total_cache_read,
-            total_cache_write = excluded.total_cache_write,
-            time_updated = excluded.time_updated,
-            time_ingested = excluded.time_ingested
-        `);
-
-        for (const session of sessions) {
-          const projectName = projectNameMap.get(session.project_id) ?? null;
-          const msgAgg = sessionMsgMap.get(session.id) ?? {
-            cost: 0,
-            tokens_input: 0,
-            tokens_output: 0,
-            tokens_reasoning: 0,
-            cache_read: 0,
-            cache_write: 0,
-            count: 0,
-          };
-          const partsAgg = sessionPartsMap.get(session.id);
-
-          // Prefer step-finish part totals when available (more granular);
-          // fall back to message-level aggregates otherwise.
-          const agg =
-            partsAgg !== undefined
-              ? { ...partsAgg, count: msgAgg.count }
-              : msgAgg;
-
-          upsertSession.run(
-            session.id,
-            session.project_id,
-            projectName,
-            session.title,
-            agg.count,
-            agg.cost,
-            agg.tokens_input,
-            agg.tokens_output,
-            agg.tokens_reasoning,
-            agg.cache_read,
-            agg.cache_write,
-            session.time_created,
-            session.time_updated,
-            now,
-          );
-        }
-
-        // Upsert daily_stats: recompute for each date bucket touched by new sessions
-        const dateBuckets = new Set(
-          sessions.map((s) => bucketByDay(s.time_updated)),
-        );
-
-        const upsertDaily = sqlite.prepare(`
-          INSERT INTO daily_stats (
-            date, source, session_count, message_count, total_cost,
-            total_tokens_input, total_tokens_output, total_tokens_reasoning,
-            total_cache_read, total_cache_write, time_updated
-          )
-          SELECT
-            ? AS date,
-            'opencode' AS source,
-            COUNT(DISTINCT s.id) AS session_count,
-            COALESCE(SUM(s.message_count), 0) AS message_count,
-            COALESCE(SUM(s.total_cost), 0) AS total_cost,
-            COALESCE(SUM(s.total_tokens_input), 0) AS total_tokens_input,
-            COALESCE(SUM(s.total_tokens_output), 0) AS total_tokens_output,
-            COALESCE(SUM(s.total_tokens_reasoning), 0) AS total_tokens_reasoning,
-            COALESCE(SUM(s.total_cache_read), 0) AS total_cache_read,
-            COALESCE(SUM(s.total_cache_write), 0) AS total_cache_write,
-            ? AS time_updated
-          FROM sessions s
-          WHERE date(s.time_updated / 1000, 'unixepoch') = ?
-            AND s.source = 'opencode'
-          ON CONFLICT(date, source) DO UPDATE SET
-            session_count = excluded.session_count,
-            message_count = excluded.message_count,
-            total_cost = excluded.total_cost,
-            total_tokens_input = excluded.total_tokens_input,
-            total_tokens_output = excluded.total_tokens_output,
-            total_tokens_reasoning = excluded.total_tokens_reasoning,
-            total_cache_read = excluded.total_cache_read,
-            total_cache_write = excluded.total_cache_write,
-            time_updated = excluded.time_updated
-        `);
-
-        for (const date of dateBuckets) {
-          upsertDaily.run(date, now, date);
-        }
-
-        // Update session cursor
-        const maxSessionTime =
-          sessions[sessions.length - 1]?.time_updated ?? sessionSinceMs;
-        sqlite
-          .prepare(`
-            INSERT INTO ingestion_cursor (source, last_time_updated, last_synced_at)
-            VALUES ('opencode:session', ?, ?)
-            ON CONFLICT(source) DO UPDATE SET
-              last_time_updated = ?,
-              last_synced_at = ?
-          `)
-          .run(maxSessionTime, now, maxSessionTime, now);
-
-        // Update message cursor (use max time_updated from messages, or now)
-        const maxMsgTime =
-          messages.length > 0
-            ? Math.max(...messages.map((m) => m.time_updated))
-            : now;
-        sqlite
-          .prepare(`
-            INSERT INTO ingestion_cursor (source, last_time_updated, last_synced_at)
-            VALUES ('opencode:message', ?, ?)
-            ON CONFLICT(source) DO UPDATE SET
-              last_time_updated = ?,
-              last_synced_at = ?
-          `)
-          .run(maxMsgTime, now, maxMsgTime, now);
-
-        sqlite.exec("COMMIT");
-      } catch (error) {
-        sqlite.exec("ROLLBACK");
-        yield* Effect.fail(
-          new IngestionError({ reason: "Transaction failed", cause: error }),
-        );
+      if (batch === null) {
+        return;
       }
+
+      yield* writeBatch(sqlite, batch);
     });
 
     return { ingestOnce };

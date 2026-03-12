@@ -1,6 +1,7 @@
 import { HttpServer } from "@effect/platform";
 import { BunHttpServer, BunRuntime } from "@effect/platform-bun";
 import { Effect, Layer, Schedule } from "effect";
+import { OpenCodeAdapterLive } from "@/adapters/opencode/adapter";
 import { SourceDbLive } from "@/adapters/opencode/source-db";
 import { createRouter } from "@/api/router";
 import { getConfig } from "@/config";
@@ -32,6 +33,7 @@ function buildLayers(config: ReturnType<typeof getConfig>, port: number) {
     opencodeDbPath === null
       ? null
       : IngestionServiceLive.pipe(
+          Layer.provide(OpenCodeAdapterLive),
           Layer.provide(SourceDbLive(opencodeDbPath)),
           Layer.provide(dashboardDbLayer),
         );
