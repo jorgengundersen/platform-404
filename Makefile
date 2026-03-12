@@ -15,7 +15,7 @@ dev-db:
 	mkdir -p "$(DATA_DIR)"
 	rm -f "$(OPENCODE_DB)" "$(OPENCODE_DB)-wal" "$(OPENCODE_DB)-shm"
 	rm -f "$(DASHBOARD_DB)" "$(DASHBOARD_DB)-wal" "$(DASHBOARD_DB)-shm"
-	bun run scripts/seed-dev-opencode-db.ts "$(OPENCODE_DB)"
+	bun run scripts/seed-dev-db.ts "$(OPENCODE_DB)"
 
 clean-dev-db:
 	rm -rf "$(DATA_DIR)"

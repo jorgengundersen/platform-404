@@ -4,6 +4,7 @@ import {
   DateRangeParams,
   decodeDashboardRootQueryParams,
   SessionsListParams,
+  SessionsListQueryParams,
 } from "@/primitives/schemas/api-params";
 
 describe("DateRangeParams", () => {
@@ -58,6 +59,20 @@ describe("SessionsListParams", () => {
     expect(() =>
       Schema.decodeUnknownSync(SessionsListParams)({ page: 1, limit: 101 }),
     ).toThrow();
+  });
+});
+
+describe("SessionsListQueryParams", () => {
+  it("accepts optional source string and passes it through", () => {
+    const result = Schema.decodeUnknownSync(SessionsListQueryParams)({
+      source: "claude-code",
+    });
+    expect(result.source).toBe("claude-code");
+  });
+
+  it("source defaults to undefined when absent", () => {
+    const result = Schema.decodeUnknownSync(SessionsListQueryParams)({});
+    expect(result.source).toBeUndefined();
   });
 });
 
