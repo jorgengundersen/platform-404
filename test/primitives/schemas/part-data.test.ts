@@ -28,7 +28,8 @@ describe("PartData", () => {
         input: 10,
         output: 5,
         reasoning: 0,
-        cache: { read: 0, write: 0 },
+        cacheRead: 0,
+        cacheWrite: 0,
       },
     };
     const result = Schema.decodeUnknownSync(PartData)(raw);

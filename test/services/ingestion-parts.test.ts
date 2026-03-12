@@ -47,18 +47,18 @@ describe("IngestionService step-finish parts", () => {
 
       INSERT INTO message VALUES (
         'm1', 's1',
-        '{"role":"assistant","modelID":"claude-3-5-sonnet","providerID":"anthropic","cost":0,"tokens":{"input":0,"output":0,"reasoning":0,"cache":{"read":0,"write":0}}}',
+        '{"role":"assistant","modelID":"claude-3-5-sonnet","providerID":"anthropic","cost":0,"tokens":{"input":0,"output":0,"reasoning":0,"cacheRead":0,"cacheWrite":0}}',
         1000, 1001
       );
 
       INSERT INTO part VALUES (
         'pt1', 'm1', 's1',
-        '{"type":"step-finish","cost":0.03,"tokens":{"input":200,"output":80,"reasoning":5,"cache":{"read":20,"write":10}}}',
+        '{"type":"step-finish","cost":0.03,"tokens":{"input":200,"output":80,"reasoning":5,"cacheRead":20,"cacheWrite":10}}',
         1000, 1001
       );
       INSERT INTO part VALUES (
         'pt2', 'm1', 's1',
-        '{"type":"step-finish","cost":0.02,"tokens":{"input":100,"output":40,"reasoning":0,"cache":{"read":10,"write":5}}}',
+        '{"type":"step-finish","cost":0.02,"tokens":{"input":100,"output":40,"reasoning":0,"cacheRead":10,"cacheWrite":5}}',
         1200, 1201
       );
     `);

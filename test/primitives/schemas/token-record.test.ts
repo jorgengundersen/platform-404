@@ -8,14 +8,15 @@ describe("TokenRecord", () => {
       input: 10,
       output: 20,
       reasoning: 5,
-      cache: { read: 1, write: 2 },
+      cacheRead: 1,
+      cacheWrite: 2,
     };
     const result = Schema.decodeUnknownSync(TokenRecord)(raw);
     expect(result).toEqual(raw);
   });
 
   it("fails on missing field", () => {
-    const raw = { input: 10, output: 20, reasoning: 5 };
+    const raw = { input: 10, output: 20, reasoning: 5, cacheRead: 1 };
     expect(() => Schema.decodeUnknownSync(TokenRecord)(raw)).toThrow();
   });
 });

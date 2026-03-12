@@ -17,7 +17,8 @@ describe("AssistantMessageData", () => {
         input: 100,
         output: 50,
         reasoning: 0,
-        cache: { read: 0, write: 0 },
+        cacheRead: 0,
+        cacheWrite: 0,
       },
       finish: "end_turn",
     };
@@ -36,7 +37,8 @@ describe("AssistantMessageData", () => {
         input: 200,
         output: 100,
         reasoning: 10,
-        cache: { read: 5, write: 5 },
+        cacheRead: 5,
+        cacheWrite: 5,
       },
     };
     const result = Schema.decodeUnknownSync(AssistantMessageData)(raw);
@@ -52,7 +54,8 @@ describe("AssistantMessageData", () => {
         input: 200,
         output: 100,
         reasoning: 0,
-        cache: { read: 0, write: 0 },
+        cacheRead: 0,
+        cacheWrite: 0,
       },
     };
     expect(() => Schema.decodeUnknownSync(AssistantMessageData)(raw)).toThrow();
@@ -104,7 +107,8 @@ describe("MessageData union", () => {
         input: 10,
         output: 5,
         reasoning: 0,
-        cache: { read: 0, write: 0 },
+        cacheRead: 0,
+        cacheWrite: 0,
       },
     };
     const result = Schema.decodeUnknownSync(MessageData)(raw);

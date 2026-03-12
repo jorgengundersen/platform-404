@@ -6,7 +6,8 @@ const zero = (): TokenTotals => ({
   input: 0,
   output: 0,
   reasoning: 0,
-  cache: { read: 0, write: 0 },
+  cacheRead: 0,
+  cacheWrite: 0,
 });
 
 export function sumTokens(records: readonly TokenRecord[]): TokenTotals {
@@ -15,10 +16,8 @@ export function sumTokens(records: readonly TokenRecord[]): TokenTotals {
       input: acc.input + r.input,
       output: acc.output + r.output,
       reasoning: acc.reasoning + r.reasoning,
-      cache: {
-        read: acc.cache.read + r.cache.read,
-        write: acc.cache.write + r.cache.write,
-      },
+      cacheRead: acc.cacheRead + r.cacheRead,
+      cacheWrite: acc.cacheWrite + r.cacheWrite,
     }),
     zero(),
   );
@@ -33,7 +32,8 @@ export function avgTokensPerMessage(
     input: total.input / count,
     output: total.output / count,
     reasoning: total.reasoning / count,
-    cache: { read: total.cache.read / count, write: total.cache.write / count },
+    cacheRead: total.cacheRead / count,
+    cacheWrite: total.cacheWrite / count,
   };
 }
 

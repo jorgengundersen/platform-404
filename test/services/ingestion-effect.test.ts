@@ -52,13 +52,13 @@ describe("IngestionService.ingestOnce (Effect)", () => {
       );
       INSERT INTO message VALUES (
         'm2', 's1',
-        '{"role":"assistant","modelID":"claude-3-5-sonnet","providerID":"anthropic","cost":0.05,"tokens":{"input":100,"output":50,"reasoning":0,"cache":{"read":10,"write":5}}}',
+        '{"role":"assistant","modelID":"claude-3-5-sonnet","providerID":"anthropic","cost":0.05,"tokens":{"input":100,"output":50,"reasoning":0,"cacheRead":10,"cacheWrite":5}}',
         1500, 1501
       );
 
       INSERT INTO part VALUES (
         'pt1', 'm2', 's1',
-        '{"type":"step-finish","cost":0.05,"tokens":{"input":100,"output":50,"reasoning":0,"cache":{"read":10,"write":5}}}',
+        '{"type":"step-finish","cost":0.05,"tokens":{"input":100,"output":50,"reasoning":0,"cacheRead":10,"cacheWrite":5}}',
         1500, 1501
       );
     `);

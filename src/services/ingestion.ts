@@ -159,8 +159,8 @@ export const IngestionServiceLive: Layer.Layer<
               assistant.tokens.input,
               assistant.tokens.output,
               assistant.tokens.reasoning,
-              assistant.tokens.cache.read,
-              assistant.tokens.cache.write,
+              assistant.tokens.cacheRead,
+              assistant.tokens.cacheWrite,
               msg.time_created,
               now,
             );
@@ -250,9 +250,9 @@ export const IngestionServiceLive: Layer.Layer<
             tokens_reasoning:
               existing.tokens_reasoning + (assistant?.tokens.reasoning ?? 0),
             cache_read:
-              existing.cache_read + (assistant?.tokens.cache.read ?? 0),
+              existing.cache_read + (assistant?.tokens.cacheRead ?? 0),
             cache_write:
-              existing.cache_write + (assistant?.tokens.cache.write ?? 0),
+              existing.cache_write + (assistant?.tokens.cacheWrite ?? 0),
             count: existing.count + 1,
           });
         }
@@ -299,8 +299,8 @@ export const IngestionServiceLive: Layer.Layer<
             tokens_output: existing.tokens_output + decoded.tokens.output,
             tokens_reasoning:
               existing.tokens_reasoning + decoded.tokens.reasoning,
-            cache_read: existing.cache_read + decoded.tokens.cache.read,
-            cache_write: existing.cache_write + decoded.tokens.cache.write,
+            cache_read: existing.cache_read + decoded.tokens.cacheRead,
+            cache_write: existing.cache_write + decoded.tokens.cacheWrite,
           });
         }
 

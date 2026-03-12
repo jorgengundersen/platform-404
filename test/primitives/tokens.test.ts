@@ -16,7 +16,8 @@ const r = (
   input: i,
   output: o,
   reasoning,
-  cache: { read: cr, write: cw },
+  cacheRead: cr,
+  cacheWrite: cw,
 });
 
 describe("sumTokens", () => {
@@ -26,7 +27,8 @@ describe("sumTokens", () => {
       input: 11,
       output: 22,
       reasoning: 33,
-      cache: { read: 44, write: 55 },
+      cacheRead: 44,
+      cacheWrite: 55,
     });
   });
 
@@ -40,7 +42,8 @@ describe("sumTokens", () => {
       input: 0,
       output: 0,
       reasoning: 0,
-      cache: { read: 0, write: 0 },
+      cacheRead: 0,
+      cacheWrite: 0,
     });
   });
 
@@ -49,7 +52,8 @@ describe("sumTokens", () => {
       input: 0,
       output: 0,
       reasoning: 0,
-      cache: { read: 0, write: 0 },
+      cacheRead: 0,
+      cacheWrite: 0,
     });
   });
 });
@@ -60,13 +64,15 @@ describe("avgTokensPerMessage", () => {
       input: 10,
       output: 20,
       reasoning: 30,
-      cache: { read: 40, write: 50 },
+      cacheRead: 40,
+      cacheWrite: 50,
     };
     expect(avgTokensPerMessage(total, 5)).toEqual({
       input: 2,
       output: 4,
       reasoning: 6,
-      cache: { read: 8, write: 10 },
+      cacheRead: 8,
+      cacheWrite: 10,
     });
   });
 
@@ -75,13 +81,15 @@ describe("avgTokensPerMessage", () => {
       input: 10,
       output: 20,
       reasoning: 5,
-      cache: { read: 3, write: 7 },
+      cacheRead: 3,
+      cacheWrite: 7,
     };
     expect(avgTokensPerMessage(total, 0)).toEqual({
       input: 0,
       output: 0,
       reasoning: 0,
-      cache: { read: 0, write: 0 },
+      cacheRead: 0,
+      cacheWrite: 0,
     });
   });
 });
