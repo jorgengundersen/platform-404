@@ -37,7 +37,7 @@ describe("GET /api/health", () => {
         .prepare(
           "INSERT INTO ingestion_cursor (source, last_time_updated, last_synced_at) VALUES (?, ?, ?)",
         )
-        .run("opencode_session", now, now);
+        .run("opencode:session", now, now);
 
       const req = new Request("http://localhost:3000/api/health", {
         method: "GET",

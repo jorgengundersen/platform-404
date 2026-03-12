@@ -79,7 +79,7 @@ describe("IngestionService cursor watermark", () => {
       ).m;
       const cursor = sqlite
         .query(
-          "SELECT last_time_updated FROM ingestion_cursor WHERE source = 'opencode_session'",
+          "SELECT last_time_updated FROM ingestion_cursor WHERE source = 'opencode:session'",
         )
         .get() as { last_time_updated: number } | null;
 

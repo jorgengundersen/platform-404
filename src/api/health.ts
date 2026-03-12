@@ -14,7 +14,7 @@ export const healthHandler = (
 
     const cursor = sqlite
       .query("SELECT last_synced_at FROM ingestion_cursor WHERE source = ?")
-      .get("opencode_session") as { last_synced_at: number } | null;
+      .get("opencode:session") as { last_synced_at: number } | null;
 
     const lastSync = cursor?.last_synced_at ?? null;
 

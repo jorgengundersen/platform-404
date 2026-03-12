@@ -57,7 +57,7 @@ export const IngestionServiceLive: Layer.Layer<
       // ---- 1. Sessions ----
       const sessionCursorRow = sqlite
         .query(
-          "SELECT last_time_updated FROM ingestion_cursor WHERE source = 'opencode_session'",
+          "SELECT last_time_updated FROM ingestion_cursor WHERE source = 'opencode:session'",
         )
         .get() as { last_time_updated: number } | null;
 
@@ -373,12 +373,13 @@ export const IngestionServiceLive: Layer.Layer<
 
         const upsertDaily = sqlite.prepare(`
           INSERT INTO daily_stats (
-            date, session_count, message_count, total_cost,
+            date, source, session_count, message_count, total_cost,
             total_tokens_input, total_tokens_output, total_tokens_reasoning,
             total_cache_read, total_cache_write, time_updated
           )
           SELECT
             ? AS date,
+            'opencode' AS source,
             COUNT(DISTINCT s.id) AS session_count,
             COALESCE(SUM(s.message_count), 0) AS message_count,
             COALESCE(SUM(s.total_cost), 0) AS total_cost,
@@ -390,7 +391,8 @@ export const IngestionServiceLive: Layer.Layer<
             ? AS time_updated
           FROM sessions s
           WHERE date(s.time_updated / 1000, 'unixepoch') = ?
-          ON CONFLICT(date) DO UPDATE SET
+            AND s.source = 'opencode'
+          ON CONFLICT(date, source) DO UPDATE SET
             session_count = excluded.session_count,
             message_count = excluded.message_count,
             total_cost = excluded.total_cost,
@@ -412,7 +414,7 @@ export const IngestionServiceLive: Layer.Layer<
         sqlite
           .prepare(`
             INSERT INTO ingestion_cursor (source, last_time_updated, last_synced_at)
-            VALUES ('opencode_session', ?, ?)
+            VALUES ('opencode:session', ?, ?)
             ON CONFLICT(source) DO UPDATE SET
               last_time_updated = ?,
               last_synced_at = ?
@@ -427,7 +429,7 @@ export const IngestionServiceLive: Layer.Layer<
         sqlite
           .prepare(`
             INSERT INTO ingestion_cursor (source, last_time_updated, last_synced_at)
-            VALUES ('opencode_message', ?, ?)
+            VALUES ('opencode:message', ?, ?)
             ON CONFLICT(source) DO UPDATE SET
               last_time_updated = ?,
               last_synced_at = ?

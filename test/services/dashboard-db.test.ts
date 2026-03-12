@@ -260,4 +260,245 @@ describe("DashboardDb schema migration", () => {
       }
     }
   });
+
+  test("schema v3: migrates source/metadata columns, daily_stats composite PK, and ingestion_cursor keys idempotently", () => {
+    const testDbPath = `/tmp/test-dashboard-v3-${Date.now()}.db`;
+    try {
+      const oldDb = new Database(testDbPath);
+      oldDb.exec(`
+        CREATE TABLE ingestion_cursor (
+          source TEXT PRIMARY KEY,
+          last_time_updated INTEGER,
+          last_synced_at INTEGER
+        );
+
+        CREATE TABLE sessions (
+          id TEXT PRIMARY KEY,
+          project_id TEXT,
+          project_name TEXT,
+          title TEXT,
+          version TEXT,
+          summary_additions INTEGER,
+          summary_deletions INTEGER,
+          summary_files INTEGER,
+          message_count INTEGER,
+          total_cost REAL,
+          total_tokens_input INTEGER,
+          total_tokens_output INTEGER,
+          total_tokens_reasoning INTEGER,
+          total_cache_read INTEGER,
+          total_cache_write INTEGER,
+          time_created INTEGER,
+          time_updated INTEGER,
+          time_ingested INTEGER
+        );
+
+        CREATE TABLE messages (
+          id TEXT PRIMARY KEY,
+          session_id TEXT,
+          role TEXT,
+          provider_id TEXT,
+          model_id TEXT,
+          agent TEXT,
+          cost REAL,
+          tokens_input INTEGER,
+          tokens_output INTEGER,
+          tokens_reasoning INTEGER,
+          cache_read INTEGER,
+          cache_write INTEGER,
+          time_created INTEGER,
+          time_ingested INTEGER
+        );
+
+        CREATE TABLE daily_stats (
+          date TEXT PRIMARY KEY,
+          session_count INTEGER,
+          message_count INTEGER,
+          total_cost REAL,
+          total_tokens_input INTEGER,
+          total_tokens_output INTEGER,
+          total_tokens_reasoning INTEGER,
+          total_cache_read INTEGER,
+          total_cache_write INTEGER,
+          time_updated INTEGER
+        );
+      `);
+
+      oldDb
+        .prepare(
+          "INSERT INTO ingestion_cursor (source, last_time_updated, last_synced_at) VALUES (?, ?, ?)",
+        )
+        .run("opencode_session", 111, 222);
+      oldDb
+        .prepare(
+          "INSERT INTO ingestion_cursor (source, last_time_updated, last_synced_at) VALUES (?, ?, ?)",
+        )
+        .run("opencode_message", 333, 444);
+
+      oldDb
+        .prepare(
+          `INSERT INTO sessions (
+            id, project_id, project_name, title, version,
+            summary_additions, summary_deletions, summary_files, message_count,
+            total_cost, total_tokens_input, total_tokens_output, total_tokens_reasoning,
+            total_cache_read, total_cache_write, time_created, time_updated, time_ingested
+          ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+        )
+        .run(
+          "s1",
+          "proj1",
+          "Project One",
+          "Session 1",
+          "v1",
+          1,
+          2,
+          3,
+          4,
+          5.5,
+          10,
+          11,
+          12,
+          13,
+          14,
+          1000,
+          2000,
+          3000,
+        );
+
+      oldDb
+        .prepare(
+          `INSERT INTO messages (
+            id, session_id, role, provider_id, model_id, agent,
+            cost, tokens_input, tokens_output, tokens_reasoning,
+            cache_read, cache_write, time_created, time_ingested
+          ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+        )
+        .run(
+          "m1",
+          "s1",
+          "assistant",
+          "openai",
+          "gpt-4",
+          null,
+          1.25,
+          20,
+          21,
+          22,
+          23,
+          24,
+          4000,
+          5000,
+        );
+
+      oldDb
+        .prepare(
+          `INSERT INTO daily_stats (
+            date, session_count, message_count, total_cost,
+            total_tokens_input, total_tokens_output, total_tokens_reasoning,
+            total_cache_read, total_cache_write, time_updated
+          ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+        )
+        .run("2026-03-12", 1, 1, 1.25, 20, 21, 22, 23, 24, 9999);
+
+      oldDb.close();
+
+      const openProgram = Effect.gen(function* () {
+        return yield* DashboardDb;
+      });
+
+      const first = Effect.runSync(
+        openProgram.pipe(Effect.provide(DashboardDbLive(testDbPath))),
+      );
+      const firstSessionsCols = first.sqlite
+        .query("PRAGMA table_info(sessions)")
+        .all() as Array<{ name: string }>;
+      const firstMessagesCols = first.sqlite
+        .query("PRAGMA table_info(messages)")
+        .all() as Array<{ name: string }>;
+      const firstDailyCols = first.sqlite
+        .query("PRAGMA table_info(daily_stats)")
+        .all() as Array<{ name: string; pk: number }>;
+
+      const sessionRow = first.sqlite
+        .query("SELECT source, metadata FROM sessions WHERE id = 's1'")
+        .get() as { source: string; metadata: string | null } | null;
+      const messageRow = first.sqlite
+        .query("SELECT source, metadata FROM messages WHERE id = 'm1'")
+        .get() as { source: string; metadata: string | null } | null;
+      const dailyRow = first.sqlite
+        .query(
+          "SELECT source, total_cost FROM daily_stats WHERE date = '2026-03-12'",
+        )
+        .get() as { source: string; total_cost: number } | null;
+      const sessionCursor = first.sqlite
+        .query(
+          "SELECT last_time_updated, last_synced_at FROM ingestion_cursor WHERE source = 'opencode:session'",
+        )
+        .get() as { last_time_updated: number; last_synced_at: number } | null;
+      const messageCursor = first.sqlite
+        .query(
+          "SELECT last_time_updated, last_synced_at FROM ingestion_cursor WHERE source = 'opencode:message'",
+        )
+        .get() as { last_time_updated: number; last_synced_at: number } | null;
+      const oldSessionCursor = first.sqlite
+        .query(
+          "SELECT source FROM ingestion_cursor WHERE source = 'opencode_session'",
+        )
+        .get() as { source: string } | null;
+      const oldMessageCursor = first.sqlite
+        .query(
+          "SELECT source FROM ingestion_cursor WHERE source = 'opencode_message'",
+        )
+        .get() as { source: string } | null;
+
+      expect(firstSessionsCols.map((col) => col.name)).toContain("source");
+      expect(firstSessionsCols.map((col) => col.name)).toContain("metadata");
+      expect(firstMessagesCols.map((col) => col.name)).toContain("source");
+      expect(firstMessagesCols.map((col) => col.name)).toContain("metadata");
+      expect(firstDailyCols.find((col) => col.name === "date")?.pk).toBe(1);
+      expect(firstDailyCols.find((col) => col.name === "source")?.pk).toBe(2);
+      expect(sessionRow).toEqual({ source: "opencode", metadata: null });
+      expect(messageRow).toEqual({ source: "opencode", metadata: null });
+      expect(dailyRow).toEqual({ source: "opencode", total_cost: 1.25 });
+      expect(sessionCursor).toEqual({
+        last_time_updated: 111,
+        last_synced_at: 222,
+      });
+      expect(messageCursor).toEqual({
+        last_time_updated: 333,
+        last_synced_at: 444,
+      });
+      expect(oldSessionCursor).toBeNull();
+      expect(oldMessageCursor).toBeNull();
+
+      first.sqlite.close();
+
+      const second = Effect.runSync(
+        openProgram.pipe(Effect.provide(DashboardDbLive(testDbPath))),
+      );
+      const cursorCount = (
+        second.sqlite
+          .query(
+            "SELECT COUNT(*) as c FROM ingestion_cursor WHERE source IN ('opencode:session', 'opencode:message')",
+          )
+          .get() as { c: number }
+      ).c;
+      const dailyCount = (
+        second.sqlite
+          .query(
+            "SELECT COUNT(*) as c FROM daily_stats WHERE date = '2026-03-12' AND source = 'opencode'",
+          )
+          .get() as { c: number }
+      ).c;
+
+      expect(cursorCount).toBe(2);
+      expect(dailyCount).toBe(1);
+
+      second.sqlite.close();
+    } finally {
+      if (fs.existsSync(testDbPath)) {
+        fs.unlinkSync(testDbPath);
+      }
+    }
+  });
 });
