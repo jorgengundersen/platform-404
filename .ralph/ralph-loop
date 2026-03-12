@@ -1,5 +1,6 @@
 #!/usr/bin/env bash
 set -euo pipefail
+set -x  # Full debug trace
 
 # Ralph Wiggum Loop (minimal)
 # Coined by Geoffrey Huntley - https://ghuntley.com/ralph
@@ -12,7 +13,7 @@ set -euo pipefail
 # ---------------------------------------------------------------------------
 # Defaults (adjust these)
 # ---------------------------------------------------------------------------
-DEFAULT_MODEL="opencode/gpt-5.3-codex"
+DEFAULT_MODEL="sonnet"
 DEFAULT_PROMPT=".ralph/DEFAULT_PROMPT.md"
 DEFAULT_MAX_ITERATIONS=10
 DEFAULT_DONE_FILE=".ralph/general.DONE"
@@ -93,8 +94,14 @@ log() {
 # Helpers
 # ---------------------------------------------------------------------------
 # Keep only issues labeled 'ok' (case-insensitive).
-BD_READY_FILTERED() {
-  bd ready --json 2>/dev/null | jq '[.[] | select(any((.labels // [])[]; ascii_downcase == "ok"))]'
+bd_ready_filtered() {
+  local raw
+  if ! raw="$(bd ready --json 2>&1)"; then
+    log WARN "event=bd_ready_failed output=$raw"
+    echo '[]'
+    return 1
+  fi
+  echo "$raw" | jq '[.[] | select(any((.labels // [])[]; ascii_downcase == "ok"))]'
 }
 
 # ---------------------------------------------------------------------------
@@ -105,8 +112,8 @@ if [[ ! -f "$PROMPT_FILE" ]]; then
   exit 1
 fi
 
-if ! command -v opencode &>/dev/null; then
-  log ERROR "opencode not found in PATH"
+if ! command -v claude &>/dev/null; then
+  log ERROR "claude not found in PATH"
   exit 1
 fi
 
@@ -148,6 +155,12 @@ fi
 : > "$DONE_FILE"
 
 # ---------------------------------------------------------------------------
+# Signal handling
+# ---------------------------------------------------------------------------
+trap 'log INFO "event=signal signal=INT"; EXIT_REASON="signal"; break 2>/dev/null || exit 130' INT
+trap 'log INFO "event=signal signal=TERM"; EXIT_REASON="signal"; break 2>/dev/null || exit 143' TERM
+
+# ---------------------------------------------------------------------------
 # Exit checks
 # ---------------------------------------------------------------------------
 check_done_file() {
@@ -156,7 +169,7 @@ check_done_file() {
 
 check_no_ready_work() {
   local ready
-  ready="$(BD_READY_FILTERED)"
+  ready="$(bd_ready_filtered)"
   [[ "$ready" == "[]" || "$ready" == "" ]]
 }
 
@@ -165,7 +178,7 @@ check_no_ready_work() {
 # ---------------------------------------------------------------------------
 RUN_START=$(date +%s)
 
-log INFO "event=start loop_type=$LOOP_TYPE project=$PROJECT_DIR model=$MODEL prompt=$PROMPT_REL done_file=$DONE_FILE log_dir=$LOG_DIR max=$MAX_ITERATIONS daemon=$DAEMON_MODE sleep_interval=$SLEEP_INTERVAL max_idle=$MAX_IDLE log=$LOG_FILE ready_filter=exclude_experiment"
+log INFO "event=start loop_type=$LOOP_TYPE project=$PROJECT_DIR model=$MODEL prompt=$PROMPT_REL done_file=$DONE_FILE log_dir=$LOG_DIR max=$MAX_ITERATIONS daemon=$DAEMON_MODE sleep_interval=$SLEEP_INTERVAL max_idle=$MAX_IDLE log=$LOG_FILE ready_filter=label_ok"
 
 SESSIONS_RUN=0
 IDLE_CYCLES=0
@@ -209,14 +222,7 @@ while true; do
   # Work is available — reset idle counter
   IDLE_CYCLES=0
 
-  # --- guard: max iterations (normal mode only) ---
-  if ! $DAEMON_MODE && [[ "$LOOP_COUNT" -gt "$MAX_ITERATIONS" ]]; then
-    log WARN "event=max_iterations max=$MAX_ITERATIONS msg=max iterations reached"
-    EXIT_REASON="max"
-    break
-  fi
-
-  READY_COUNT="$(BD_READY_FILTERED | jq 'length' 2>/dev/null || echo '?')"
+  READY_COUNT="$(bd_ready_filtered | jq 'length' 2>/dev/null || echo '?')"
   if $DAEMON_MODE; then
     log INFO "event=session_start loop=$LOOP_COUNT ready=$READY_COUNT"
   else
@@ -224,9 +230,8 @@ while true; do
   fi
 
   ITER_START=$(date +%s)
-  PROMPT=$(cat "$PROMPT_FILE")
   set +e
-  opencode run "$PROMPT" --model "$MODEL" --dir "$PROJECT_DIR" --thinking "true"
+  claude -p "$(cat "$PROMPT_FILE")" --model "$MODEL" --agent ralph --add-dir "$PROJECT_DIR"
   SESSION_EXIT=$?
   set -e
   ITER_END=$(date +%s)
@@ -246,14 +251,14 @@ while true; do
     break
   fi
 
-  # --- max iterations guard (normal mode, post-session) ---
+  # --- guard: max iterations (normal mode only) ---
   if ! $DAEMON_MODE && [[ "$SESSIONS_RUN" -ge "$MAX_ITERATIONS" ]]; then
-    log WARN "event=max_iterations max=$MAX_ITERATIONS msg=max iterations reached"
+    log INFO "event=max_iterations max=$MAX_ITERATIONS msg=max iterations reached"
     EXIT_REASON="max"
     break
   fi
 done
 
-REMAINING_READY="$(BD_READY_FILTERED | jq 'length' 2>/dev/null || echo '?')"
+REMAINING_READY="$(bd_ready_filtered | jq 'length' 2>/dev/null || echo '?')"
 RUN_END=$(date +%s)
 log INFO "event=finish sessions=$SESSIONS_RUN exit_reason=$EXIT_REASON remaining_ready=$REMAINING_READY total_duration=$((RUN_END - RUN_START))s"
